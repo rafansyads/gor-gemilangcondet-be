@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    # URL Database Supabase Asli
+    url: ${SUPABASE_DB_URL}
+    # Ambil value dari Environment Variable VPS
+    username: ${DB_USER}     
+    password: ${DB_PASSWORD} 
+  
+  jpa:
+    # "validate": Cuma ngecek tabel. Gak boleh ubah struktur tabel sembarangan di Prod.
+    hibernate:
+      ddl-auto: validate
+    show-sql: false # Matikan log SQL biar server gak penuh log sampah
+
+# Konfigurasi JWT Production (Harus beda dari Dev!)
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration: 3600000 # 1 Jam (Lebih aman expired cepat)

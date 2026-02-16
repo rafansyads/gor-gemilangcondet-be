@@ -1,0 +1,16 @@
+services:
+  gor-gemilangcondet-db:
+    image: postgres:17.5-alpine
+    ports:
+      - "35001:5432"
+    restart: "no"
+    environment:
+      POSTGRES_DB: gor-gemilangcondet-dev
+      POSTGRES_USER: gor-gemilangcondet-dev
+      POSTGRES_PASSWORD: CLI-825.2025X
+    volumes:
+      - gor-gemilangcondet-db:/var/lib/postgresql/data
+
+volumes:
+  gor-gemilangcondet-db:
+    driver: local

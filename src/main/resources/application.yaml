@@ -1,0 +1,30 @@
+server:
+  port: ${SERVER_PORT:8080} # Gunakan PORT dari environment variable, default 8080
+
+spring:
+  application:
+    name: backend-api
+
+  web:
+    # Jika nanti ada error, tampilkan pesannya (berguna buat API)
+    error:
+      include-message: always
+
+  # Pengaturan Format Tanggal (Penting buat Booking)
+  jackson:
+    date-format: dd-MM-yyyy HH:mm:ss
+    time-zone: Asia/Jakarta
+
+  # Driver Database (Sama-sama Postgres buat Dev & Prod)
+  datasource:
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+# Default Profile: Kalau tidak disetting apa-apa, anggap mode DEV
+  profiles:
+    active: dev

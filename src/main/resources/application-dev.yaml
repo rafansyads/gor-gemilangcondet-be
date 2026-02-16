@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    # Gunakan koneksi database di PostgreSQL docker lokal
+    url: "jdbc:postgresql://localhost:5432/gor-gemilangcondet-dev"
+    username: ${DB_USER:gor-gemilangcondet-dev}
+    password: ${DB_PASSWORD:CLI-825.2025X}
+  
+  jpa:
+    # "update": Kalau kamu ubah kodingan Entity, tabel database otomatis berubah
+    hibernate:
+      ddl-auto: update
+    # Tampilkan query SQL di terminal biar tau kodinganmu ngirim apa
+    show-sql: true
+
+# Konfigurasi JWT untuk development (jangan dipakai sama di production!)
+app:
+  jwt:
+    secret: ${JWT_SECRET:RahasiaLokalJanganDipakaiDiProduction1234567890}
+    expiration: 86400000 # 24 Jam
