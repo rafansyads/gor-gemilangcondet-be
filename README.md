@@ -37,6 +37,10 @@ test/
 - **resources**: App properties, static assets, and templates.
 - **tests**: Unit and integration tests.
 
+## Task Owners (to be added and adapted later on)
+
+- Rafansya Daryltama Santoso (2306211231): `login`, `registrasi`, `logout`, `transaksi kantin dan toko`, `manajemen membership`
+
 ## Getting Started
 
 1. Clone this repository using `git clone` with HTTPS URL: `https://gitlab.cs.ui.ac.id/propensi-2025-2026-genap/kelas-c/mpruy/mpruy-backend.git`;
