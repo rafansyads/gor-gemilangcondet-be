@@ -17,4 +17,7 @@ public class AuthResponse {
     private String username;
 
     private String role;
+
+    /** Optional frontend redirect URL echo'd back from the login request. */
+    private String redirectUrl;
 }
