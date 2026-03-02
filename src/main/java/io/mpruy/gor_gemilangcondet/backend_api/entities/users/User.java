@@ -29,6 +29,9 @@ public class User {
 
     private LocalDateTime membershipEnd;
 
+    @Column(nullable = false)
+    private String password;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "role_id", nullable = false)
     private Role role;
