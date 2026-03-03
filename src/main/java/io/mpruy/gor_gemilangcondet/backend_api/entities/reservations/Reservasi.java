@@ -38,6 +38,15 @@ public class Reservasi {
     @Column(nullable = false)
     private UUID userId;
 
+    @Column(nullable = false)
+    private String namaWakil;
+
+    @Column(nullable = false)
+    private String nomorTelepon;
+
+    @Column(nullable = false)
+    private int jumlahOrang;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "lapangan_id", nullable = false)
     private Lapangan lapangan;
