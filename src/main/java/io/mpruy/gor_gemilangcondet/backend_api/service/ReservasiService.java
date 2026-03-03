@@ -350,6 +350,13 @@ public class ReservasiService {
                     "Reservasi yang sudah " + reservasi.getStatus() + " tidak dapat dijadwal ulang");
         }
 
+        // reschedule only allowed >= 24 hours before original start
+        long hoursUntilStart = ChronoUnit.HOURS.between(now, reservasi.getReservationStart());
+        if (hoursUntilStart < 24) {
+        throw new IllegalArgumentException(
+                "Penjadwalan ulang hanya dapat dilakukan minimal 24 jam sebelum jadwal mulai.");
+        }
+
         // 3. Validate: new date must not be in the past
         if (request.getNewReservationStart().isBefore(now)) {
             throw new IllegalArgumentException("Tanggal reservasi baru tidak boleh di masa lalu");
