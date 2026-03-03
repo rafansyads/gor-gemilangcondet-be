@@ -40,8 +40,7 @@ test/
 
 Task Owners (to be added and adapted later on)
 
-
-Muhammad Fadhil Nur Aziz (2306275531) : Reservasi Lapangan, Rekapitulasi Sewa, Pemantauan Biaya (Cost Monitoring)
+A. Sherwyn Fawwaz Nitisara S. (2306165811) : `Penjadwalan Ulang (Reschedule)`, `Update Informasi & Tarif Lapangan`, `Tambah Produk Kantin/Toko`, `Riwayat Kartu Stok (Stock Card)`, `Laporan Kasir Harian`, `Rekapitulasi Sewa`
 
 ## Getting Started
 
