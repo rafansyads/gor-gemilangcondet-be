@@ -82,26 +82,6 @@ public class ReservasiController {
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // GET /bookings/courts — List all courts (optionally filtered by type)
-    // ──────────────────────────────────────────────────────────────────────────
-
-    @GetMapping("/courts")
-    public ResponseEntity<BaseResponseDto<List<LapanganResponse>>> getCourts(
-            @RequestParam(required = false) LapanganType type) {
-        try {
-            List<LapanganResponse> courts = (type != null)
-                    ? reservasiService.getCourtsByType(type)
-                    : reservasiService.getAllCourts();
-            return ResponseUtil.success(courts, "Data lapangan berhasil diambil", HttpStatus.OK)
-                    .toBuilder().build();
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Gagal mengambil data lapangan: " + ex.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    // ──────────────────────────────────────────────────────────────────────────
     // GET /bookings/availability — Court availability for a date
     // ──────────────────────────────────────────────────────────────────────────
 

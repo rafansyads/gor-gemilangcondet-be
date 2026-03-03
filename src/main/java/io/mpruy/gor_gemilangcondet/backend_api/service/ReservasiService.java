@@ -1,8 +1,6 @@
 package io.mpruy.gor_gemilangcondet.backend_api.service;
 
-import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.requests.CreateReservasiRequest;
-import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.requests.RentItemRequest;
-import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.requests.RescheduleReservasiRequest;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.requests.*;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.responses.*;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.*;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.AlatOlahraga;
@@ -401,6 +399,62 @@ public class ReservasiService {
         reservasiRepository.save(reservasi);
 
         return toReservasiResponse(reservasi);
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Court CRUD
+    // ──────────────────────────────────────────────────────────────────────────
+
+    @Transactional
+    public LapanganResponse createCourt(CreateLapanganRequest request) {
+        LocalDateTime now = LocalDateTime.now(ZONE_JAKARTA);
+        Lapangan lapangan = Lapangan.builder()
+                .name(request.getName())
+                .type(request.getType())
+                .tarifPerJam(request.getTarifPerJam())
+                .status(LapanganStatus.TERSEDIA)
+                .createdAt(now)
+                .updatedAt(now)
+                .build();
+        lapanganRepository.save(lapangan);
+        return toLapanganResponse(lapangan);
+    }
+
+    @Transactional
+    public LapanganResponse updateCourt(UUID id, UpdateLapanganRequest request) {
+        Lapangan lapangan = lapanganRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Lapangan tidak ditemukan: " + id));
+        lapangan.setName(request.getName());
+        lapangan.setType(request.getType());
+        lapangan.setTarifPerJam(request.getTarifPerJam());
+        lapangan.setUpdatedAt(LocalDateTime.now(ZONE_JAKARTA));
+        lapanganRepository.save(lapangan);
+        return toLapanganResponse(lapangan);
+    }
+
+    @Transactional
+    public void deleteCourt(UUID id) {
+        Lapangan lapangan = lapanganRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Lapangan tidak ditemukan: " + id));
+        // Check if court has active reservations
+        LocalDateTime now = LocalDateTime.now(ZONE_JAKARTA);
+        List<Reservasi> active = reservasiRepository.findOverlappingReservations(
+                id, now, now.plusYears(1), INACTIVE_STATUSES);
+        if (!active.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Tidak dapat menghapus lapangan yang masih memiliki reservasi aktif");
+        }
+        lapanganRepository.delete(lapangan);
+    }
+
+    @Transactional
+    public LapanganResponse updateCourtStatus(UUID id, LapanganStatus newStatus) {
+        Lapangan lapangan = lapanganRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Lapangan tidak ditemukan: " + id));
+        lapangan.setStatus(newStatus);
+        lapangan.setUpdatedAt(LocalDateTime.now(ZONE_JAKARTA));
+        lapanganRepository.save(lapangan);
+        return toLapanganResponse(lapangan);
     }
 
     // ──────────────────────────────────────────────────────────────────────────
