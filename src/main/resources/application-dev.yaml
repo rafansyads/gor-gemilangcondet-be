@@ -12,8 +12,16 @@ spring:
     # Tampilkan query SQL di terminal biar tau kodinganmu ngirim apa
     show-sql: true
 
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
+
 # Konfigurasi JWT untuk development (jangan dipakai sama di production!)
 app:
   jwt:
     secret: ${JWT_SECRET:RahasiaLokalJanganDipakaiDiProduction1234567890}
     expiration: 86400000 # 24 Jam
+
+  upload:
+    dir: uploads/payment-proofs

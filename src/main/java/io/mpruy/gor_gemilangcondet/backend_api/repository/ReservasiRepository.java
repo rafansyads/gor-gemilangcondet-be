@@ -53,4 +53,16 @@ public interface ReservasiRepository extends JpaRepository<Reservasi, UUID> {
 
         @Query("SELECT r FROM Reservasi r JOIN FETCH r.lapangan WHERE r.status = :status")
         List<Reservasi> findByStatusWithLapangan(@Param("status") ReservasiStatus status);
+
+        @Query("SELECT r FROM Reservasi r JOIN FETCH r.lapangan WHERE r.status IN :statuses")
+        List<Reservasi> findByStatusInWithLapangan(@Param("statuses") List<ReservasiStatus> statuses);
+
+        /**
+         * Finds reservations past their payment deadline that are still BELUM_DIBAYAR.
+         */
+        @Query("SELECT r FROM Reservasi r JOIN FETCH r.lapangan " +
+                        "WHERE r.status = 'BELUM_DIBAYAR' " +
+                        "AND r.paymentDeadline IS NOT NULL " +
+                        "AND r.paymentDeadline < :now")
+        List<Reservasi> findExpiredReservations(@Param("now") LocalDateTime now);
 }
