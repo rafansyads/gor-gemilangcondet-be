@@ -40,16 +40,10 @@ public class PembayaranController {
     @GetMapping("/unpaid")
     @PreAuthorize("hasAnyAuthority('STAF_LAPANGAN', 'STAF_TOKO', 'OWNER', 'ADMIN')")
     public ResponseEntity<BaseResponseDto<List<ReservasiResponse>>> getUnpaidReservations() {
-        try {
-            List<ReservasiResponse> unpaid = pembayaranService.getUnpaidReservations();
-            return ResponseUtil.success(unpaid,
-                    "Data reservasi belum dibayar berhasil diambil", HttpStatus.OK)
-                    .toBuilder().build();
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Gagal mengambil data reservasi belum dibayar: " + ex.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        List<ReservasiResponse> unpaid = pembayaranService.getUnpaidReservations();
+        return ResponseUtil.success(unpaid,
+                "Data reservasi belum dibayar berhasil diambil", HttpStatus.OK)
+                .toBuilder().build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -59,16 +53,10 @@ public class PembayaranController {
     @GetMapping("/staff-reservations")
     @PreAuthorize("hasAnyAuthority('STAF_LAPANGAN', 'STAF_TOKO', 'OWNER', 'ADMIN')")
     public ResponseEntity<BaseResponseDto<List<ReservasiResponse>>> getStaffReservations() {
-        try {
-            List<ReservasiResponse> reservations = pembayaranService.getReservationsForStaff();
-            return ResponseUtil.success(reservations,
-                    "Data reservasi untuk staf berhasil diambil", HttpStatus.OK)
-                    .toBuilder().build();
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Gagal mengambil data reservasi: " + ex.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        List<ReservasiResponse> reservations = pembayaranService.getReservationsForStaff();
+        return ResponseUtil.success(reservations,
+                "Data reservasi untuk staf berhasil diambil", HttpStatus.OK)
+                .toBuilder().build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -79,17 +67,9 @@ public class PembayaranController {
     @PreAuthorize("hasAnyAuthority('STAF_LAPANGAN', 'STAF_TOKO', 'OWNER', 'ADMIN')")
     public ResponseEntity<BaseResponseDto<PembayaranResponse>> getPaymentByReservation(
             @PathVariable UUID reservationId) {
-        try {
-            PembayaranResponse payment = pembayaranService.getPaymentByReservationId(reservationId);
-            return ResponseUtil.success(payment, "Data pembayaran berhasil diambil", HttpStatus.OK)
-                    .toBuilder().build();
-        } catch (IllegalArgumentException ex) {
-            return ResponseUtil.error(ex.getMessage(), HttpStatus.NOT_FOUND);
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Gagal mengambil data pembayaran: " + ex.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        PembayaranResponse payment = pembayaranService.getPaymentByReservationId(reservationId);
+        return ResponseUtil.success(payment, "Data pembayaran berhasil diambil", HttpStatus.OK)
+                .toBuilder().build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -100,20 +80,10 @@ public class PembayaranController {
     public ResponseEntity<BaseResponseDto<ReservasiResponse>> uploadPaymentProof(
             @PathVariable UUID reservasiId,
             @RequestParam("file") MultipartFile file) {
-        try {
-            ReservasiResponse response = pembayaranService.uploadPaymentProof(reservasiId, file);
-            return ResponseUtil.success(response,
-                    "Bukti pembayaran berhasil diunggah", HttpStatus.OK)
-                    .toBuilder().build();
-        } catch (IllegalArgumentException ex) {
-            return ResponseUtil.error(ex.getMessage(), HttpStatus.BAD_REQUEST);
-        } catch (IllegalStateException ex) {
-            return ResponseUtil.error(ex.getMessage(), HttpStatus.CONFLICT);
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Gagal mengunggah bukti pembayaran: " + ex.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        ReservasiResponse response = pembayaranService.uploadPaymentProof(reservasiId, file);
+        return ResponseUtil.success(response,
+                "Bukti pembayaran berhasil diunggah", HttpStatus.OK)
+                .toBuilder().build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -121,30 +91,26 @@ public class PembayaranController {
     // ──────────────────────────────────────────────────────────────────────────
 
     @GetMapping("/proof/{filename}")
-    public ResponseEntity<Resource> getPaymentProof(@PathVariable String filename) {
-        try {
-            Path filePath = Paths.get(uploadDir).resolve(filename).normalize();
-            Resource resource = new UrlResource(filePath.toUri());
+    public ResponseEntity<Resource> getPaymentProof(@PathVariable String filename) throws Exception {
+        Path filePath = Paths.get(uploadDir).resolve(filename).normalize();
+        Resource resource = new UrlResource(filePath.toUri());
 
-            if (!resource.exists() || !resource.isReadable()) {
-                return ResponseEntity.notFound().build();
-            }
-
-            String contentType = "image/jpeg";
-            if (filename.endsWith(".png"))
-                contentType = "image/png";
-            else if (filename.endsWith(".gif"))
-                contentType = "image/gif";
-            else if (filename.endsWith(".webp"))
-                contentType = "image/webp";
-
-            return ResponseEntity.ok()
-                    .contentType(MediaType.parseMediaType(contentType))
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
-                    .body(resource);
-        } catch (Exception ex) {
-            return ResponseEntity.internalServerError().build();
+        if (!resource.exists() || !resource.isReadable()) {
+            return ResponseEntity.notFound().build();
         }
+
+        String contentType = "image/jpeg";
+        if (filename.endsWith(".png"))
+            contentType = "image/png";
+        else if (filename.endsWith(".gif"))
+            contentType = "image/gif";
+        else if (filename.endsWith(".webp"))
+            contentType = "image/webp";
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(contentType))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
+                .body(resource);
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -155,19 +121,9 @@ public class PembayaranController {
     @PreAuthorize("hasAnyAuthority('STAF_LAPANGAN', 'STAF_TOKO', 'OWNER', 'ADMIN')")
     public ResponseEntity<BaseResponseDto<ConfirmPaymentResponse>> confirmPayment(
             @PathVariable UUID reservasiId) {
-        try {
-            ConfirmPaymentResponse response = pembayaranService.confirmPayment(reservasiId);
-            return ResponseUtil.success(response, "Pembayaran berhasil dikonfirmasi", HttpStatus.OK)
-                    .toBuilder().build();
-        } catch (IllegalArgumentException ex) {
-            return ResponseUtil.error(ex.getMessage(), HttpStatus.BAD_REQUEST);
-        } catch (IllegalStateException ex) {
-            return ResponseUtil.error(ex.getMessage(), HttpStatus.CONFLICT);
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Gagal mengkonfirmasi pembayaran: " + ex.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        ConfirmPaymentResponse response = pembayaranService.confirmPayment(reservasiId);
+        return ResponseUtil.success(response, "Pembayaran berhasil dikonfirmasi", HttpStatus.OK)
+                .toBuilder().build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -178,18 +134,8 @@ public class PembayaranController {
     @PreAuthorize("hasAnyAuthority('STAF_LAPANGAN', 'STAF_TOKO', 'OWNER', 'ADMIN')")
     public ResponseEntity<BaseResponseDto<ConfirmPaymentResponse>> rejectPayment(
             @PathVariable UUID reservasiId) {
-        try {
-            ConfirmPaymentResponse response = pembayaranService.rejectPayment(reservasiId);
-            return ResponseUtil.success(response, "Reservasi berhasil ditolak", HttpStatus.OK)
-                    .toBuilder().build();
-        } catch (IllegalArgumentException ex) {
-            return ResponseUtil.error(ex.getMessage(), HttpStatus.BAD_REQUEST);
-        } catch (IllegalStateException ex) {
-            return ResponseUtil.error(ex.getMessage(), HttpStatus.CONFLICT);
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Gagal menolak reservasi: " + ex.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        ConfirmPaymentResponse response = pembayaranService.rejectPayment(reservasiId);
+        return ResponseUtil.success(response, "Reservasi berhasil ditolak", HttpStatus.OK)
+                .toBuilder().build();
     }
 }

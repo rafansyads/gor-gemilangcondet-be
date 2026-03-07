@@ -32,17 +32,11 @@ public class LapanganController {
     @GetMapping
     public ResponseEntity<BaseResponseDto<List<LapanganResponse>>> getCourts(
             @RequestParam(required = false) LapanganType type) {
-        try {
-            List<LapanganResponse> courts = (type != null)
-                    ? reservasiService.getCourtsByType(type)
-                    : reservasiService.getAllCourts();
-            return ResponseUtil.success(courts, "Data lapangan berhasil diambil", HttpStatus.OK)
-                    .toBuilder().build();
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Gagal mengambil data lapangan: " + ex.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        List<LapanganResponse> courts = (type != null)
+                ? reservasiService.getCourtsByType(type)
+                : reservasiService.getAllCourts();
+        return ResponseUtil.success(courts, "Data lapangan berhasil diambil", HttpStatus.OK)
+                .toBuilder().build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -52,17 +46,9 @@ public class LapanganController {
     @PostMapping
     public ResponseEntity<BaseResponseDto<LapanganResponse>> createCourt(
             @Validated @RequestBody BaseRequestDto<CreateLapanganRequest> request) {
-        try {
-            LapanganResponse response = reservasiService.createCourt(request.getData());
-            return ResponseUtil.success(response, "Lapangan berhasil ditambahkan", HttpStatus.CREATED)
-                    .toBuilder().build();
-        } catch (IllegalArgumentException ex) {
-            return ResponseUtil.error(ex.getMessage(), HttpStatus.BAD_REQUEST);
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Gagal menambahkan lapangan: " + ex.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        LapanganResponse response = reservasiService.createCourt(request.getData());
+        return ResponseUtil.success(response, "Lapangan berhasil ditambahkan", HttpStatus.CREATED)
+                .toBuilder().build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -73,17 +59,9 @@ public class LapanganController {
     public ResponseEntity<BaseResponseDto<LapanganResponse>> updateCourt(
             @PathVariable UUID id,
             @Validated @RequestBody BaseRequestDto<UpdateLapanganRequest> request) {
-        try {
-            LapanganResponse response = reservasiService.updateCourt(id, request.getData());
-            return ResponseUtil.success(response, "Lapangan berhasil diperbarui", HttpStatus.OK)
-                    .toBuilder().build();
-        } catch (IllegalArgumentException ex) {
-            return ResponseUtil.error(ex.getMessage(), HttpStatus.NOT_FOUND);
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Gagal memperbarui lapangan: " + ex.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        LapanganResponse response = reservasiService.updateCourt(id, request.getData());
+        return ResponseUtil.success(response, "Lapangan berhasil diperbarui", HttpStatus.OK)
+                .toBuilder().build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -92,17 +70,9 @@ public class LapanganController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<BaseResponseDto<Object>> deleteCourt(@PathVariable UUID id) {
-        try {
-            reservasiService.deleteCourt(id);
-            return ResponseUtil.success(null, "Lapangan berhasil dihapus", HttpStatus.OK)
-                    .toBuilder().build();
-        } catch (IllegalArgumentException ex) {
-            return ResponseUtil.error(ex.getMessage(), HttpStatus.BAD_REQUEST);
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Gagal menghapus lapangan: " + ex.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        reservasiService.deleteCourt(id);
+        return ResponseUtil.success(null, "Lapangan berhasil dihapus", HttpStatus.OK)
+                .toBuilder().build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -113,16 +83,8 @@ public class LapanganController {
     public ResponseEntity<BaseResponseDto<LapanganResponse>> updateCourtStatus(
             @PathVariable UUID id,
             @RequestParam LapanganStatus status) {
-        try {
-            LapanganResponse response = reservasiService.updateCourtStatus(id, status);
-            return ResponseUtil.success(response, "Status lapangan berhasil diperbarui", HttpStatus.OK)
-                    .toBuilder().build();
-        } catch (IllegalArgumentException ex) {
-            return ResponseUtil.error(ex.getMessage(), HttpStatus.NOT_FOUND);
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Gagal memperbarui status lapangan: " + ex.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        LapanganResponse response = reservasiService.updateCourtStatus(id, status);
+        return ResponseUtil.success(response, "Status lapangan berhasil diperbarui", HttpStatus.OK)
+                .toBuilder().build();
     }
 }

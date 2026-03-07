@@ -1,5 +1,6 @@
 package io.mpruy.gor_gemilangcondet.backend_api.security.service;
 
+import io.mpruy.gor_gemilangcondet.backend_api.exception.InvalidTokenException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -57,7 +58,7 @@ public class RefreshTokenService {
     public String validateRefreshToken(String refreshToken) {
         String username = usernameByToken.get(refreshToken);
         if (username == null) {
-            throw new IllegalArgumentException("Invalid or expired refresh token");
+            throw new InvalidTokenException("Invalid or expired refresh token");
         }
         return username;
     }

@@ -44,15 +44,9 @@ public class AuthController {
     public ResponseEntity<BaseResponseDto<AuthResponse>> login(
             @Validated @RequestBody BaseRequestDto<LoginRequest> request,
             @RequestParam(name = "redirect", required = false) String redirectUrl) {
-        try {
-            AuthResponse authResponse = authService.login(request.getData(), redirectUrl);
-            return ResponseUtil.success(authResponse, "Login successful", HttpStatus.OK)
-                    .toBuilder().build();
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Login failed: " + ex.getMessage(),
-                    HttpStatus.UNAUTHORIZED);
-        }
+        AuthResponse authResponse = authService.login(request.getData(), redirectUrl);
+        return ResponseUtil.success(authResponse, "Login successful", HttpStatus.OK)
+                .toBuilder().build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -62,17 +56,9 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<BaseResponseDto<RegisterResponse>> register(
             @Validated @RequestBody BaseRequestDto<RegisterRequest> request) {
-        try {
-            RegisterResponse registerResponse = authService.register(request.getData());
-            return ResponseUtil.success(registerResponse, "Registration successful", HttpStatus.CREATED)
-                    .toBuilder().build();
-        } catch (IllegalArgumentException ex) {
-            return ResponseUtil.error(ex.getMessage(), HttpStatus.CONFLICT);
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Registration failed: " + ex.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        RegisterResponse registerResponse = authService.register(request.getData());
+        return ResponseUtil.success(registerResponse, "Registration successful", HttpStatus.CREATED)
+                .toBuilder().build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -82,20 +68,12 @@ public class AuthController {
     @PostMapping("/register-admin")
     public ResponseEntity<BaseResponseDto<RegisterResponse>> registerAdmin(
             @Validated @RequestBody BaseRequestDto<RegisterRequest> request) {
-        try {
-            RegisterResponse registerResponse = authService.registerAdmin(request.getData());
-            return ResponseUtil.success(
-                    registerResponse,
-                    "Admin/staff account created successfully",
-                    HttpStatus.CREATED)
-                    .toBuilder().build();
-        } catch (IllegalArgumentException ex) {
-            return ResponseUtil.error(ex.getMessage(), HttpStatus.BAD_REQUEST);
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Admin registration failed: " + ex.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        RegisterResponse registerResponse = authService.registerAdmin(request.getData());
+        return ResponseUtil.success(
+                registerResponse,
+                "Admin/staff account created successfully",
+                HttpStatus.CREATED)
+                .toBuilder().build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -104,16 +82,10 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<BaseResponseDto<String>> logout(HttpServletRequest httpRequest) {
-        try {
-            String authHeader = httpRequest.getHeader("Authorization");
-            authService.logout(authHeader);
-            return ResponseUtil.success("Logged out successfully", "Logout successful", HttpStatus.OK)
-                    .toBuilder().build();
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Logout failed: " + ex.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        String authHeader = httpRequest.getHeader("Authorization");
+        authService.logout(authHeader);
+        return ResponseUtil.success("Logged out successfully", "Logout successful", HttpStatus.OK)
+                .toBuilder().build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -123,16 +95,8 @@ public class AuthController {
     @PostMapping("/refresh")
     public ResponseEntity<BaseResponseDto<AuthResponse>> refresh(
             @Validated @RequestBody BaseRequestDto<RefreshTokenRequest> request) {
-        try {
-            AuthResponse authResponse = authService.refreshToken(request.getData());
-            return ResponseUtil.success(authResponse, "Token refreshed", HttpStatus.OK)
-                    .toBuilder().build();
-        } catch (IllegalArgumentException ex) {
-            return ResponseUtil.error(ex.getMessage(), HttpStatus.UNAUTHORIZED);
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Token refresh failed: " + ex.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        AuthResponse authResponse = authService.refreshToken(request.getData());
+        return ResponseUtil.success(authResponse, "Token refreshed", HttpStatus.OK)
+                .toBuilder().build();
     }
 }

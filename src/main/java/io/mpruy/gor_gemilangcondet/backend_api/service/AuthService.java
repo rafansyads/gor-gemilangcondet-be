@@ -26,6 +26,8 @@ import io.mpruy.gor_gemilangcondet.backend_api.security.UserDetailsImpl;
 import io.mpruy.gor_gemilangcondet.backend_api.security.jwt.JwtUtils;
 import io.mpruy.gor_gemilangcondet.backend_api.security.service.JwtTokenBlacklist;
 import io.mpruy.gor_gemilangcondet.backend_api.security.service.RefreshTokenService;
+import io.mpruy.gor_gemilangcondet.backend_api.exception.BadRequestException;
+import io.mpruy.gor_gemilangcondet.backend_api.exception.ConflictException;
 import io.mpruy.gor_gemilangcondet.backend_api.service.mapper.AuthMapper;
 import io.mpruy.gor_gemilangcondet.backend_api.service.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
@@ -189,10 +191,10 @@ public class AuthService {
      */
     private void assertUsernameAndEmailFree(RegisterRequest request) {
         if (userRepository.existsByUsername(request.getUsername())) {
-            throw new IllegalArgumentException("Username is already taken: " + request.getUsername());
+            throw new ConflictException("Username is already taken: " + request.getUsername());
         }
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new IllegalArgumentException("Email is already registered: " + request.getEmail());
+            throw new ConflictException("Email is already registered: " + request.getEmail());
         }
     }
 
@@ -233,13 +235,13 @@ public class AuthService {
      */
     private void validatePassword(String password) {
         if (password == null || password.length() < 8) {
-            throw new IllegalArgumentException("Password must be at least 8 characters long.");
+            throw new BadRequestException("Password must be at least 8 characters long.");
         }
         if (password.chars().noneMatch(Character::isUpperCase)) {
-            throw new IllegalArgumentException("Password must contain at least one uppercase letter.");
+            throw new BadRequestException("Password must contain at least one uppercase letter.");
         }
         if (password.chars().noneMatch(Character::isDigit)) {
-            throw new IllegalArgumentException("Password must contain at least one digit.");
+            throw new BadRequestException("Password must contain at least one digit.");
         }
     }
 
@@ -252,18 +254,17 @@ public class AuthService {
      */
     private RoleName parseAdminRole(String rawRole) {
         if (rawRole == null || rawRole.isBlank()) {
-            // Always require an explicit role for admin registration to avoid mistakes;
-            throw new IllegalArgumentException("Role is required for admin registration.");
+            throw new BadRequestException("Role is required for admin registration.");
         }
         try {
             RoleName parsed = RoleName.valueOf(rawRole.toUpperCase());
             if (!ADMIN_ASSIGNABLE_ROLES.contains(parsed)) {
-                throw new IllegalArgumentException(
+                throw new BadRequestException(
                         "Role '" + rawRole + "' cannot be assigned via admin registration.");
             }
             return parsed;
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Unknown role: " + rawRole);
+            throw new BadRequestException("Unknown role: " + rawRole);
         }
     }
 }
