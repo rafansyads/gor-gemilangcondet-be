@@ -20,15 +20,15 @@ import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.responses.Reg
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.Role;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.RoleName;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.User;
+import io.mpruy.gor_gemilangcondet.backend_api.exception.BadRequestException;
+import io.mpruy.gor_gemilangcondet.backend_api.exception.ConflictException;
+import io.mpruy.gor_gemilangcondet.backend_api.exception.UnauthorizedException;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.RoleRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.UserRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.security.UserDetailsImpl;
 import io.mpruy.gor_gemilangcondet.backend_api.security.jwt.JwtUtils;
 import io.mpruy.gor_gemilangcondet.backend_api.security.service.JwtTokenBlacklist;
 import io.mpruy.gor_gemilangcondet.backend_api.security.service.RefreshTokenService;
-import io.mpruy.gor_gemilangcondet.backend_api.exception.BadRequestException;
-import io.mpruy.gor_gemilangcondet.backend_api.exception.UnauthorizedException;
-import io.mpruy.gor_gemilangcondet.backend_api.exception.ConflictException;
 import io.mpruy.gor_gemilangcondet.backend_api.service.mapper.AuthMapper;
 import io.mpruy.gor_gemilangcondet.backend_api.service.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
@@ -273,6 +273,15 @@ public class AuthService {
         }
         if (password.chars().noneMatch(Character::isDigit)) {
             throw new BadRequestException("Password must contain at least one digit.");
+        }
+        if (password.chars().anyMatch(Character::isWhitespace)) {
+            throw new BadRequestException("Password must not contain whitespace.");
+        }
+        // Special characters are not allowed, only "_", "-", "@", and "." are permitted
+        if (password.chars().anyMatch(ch -> !Character.isLetterOrDigit(ch)
+                && ch != '_' && ch != '-' && ch != '@' && ch != '.')) {
+            throw new BadRequestException(
+                    "Password contains invalid characters. Only letters, digits, and _ - @ . are allowed.");
         }
     }
 
