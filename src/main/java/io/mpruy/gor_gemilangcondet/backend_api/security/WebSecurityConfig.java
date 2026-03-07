@@ -1,10 +1,7 @@
 package io.mpruy.gor_gemilangcondet.backend_api.security;
 
-import io.mpruy.gor_gemilangcondet.backend_api.security.jwt.JwtTokenFilter;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
+import java.io.IOException;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -20,7 +17,11 @@ import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-import java.io.IOException;
+import io.mpruy.gor_gemilangcondet.backend_api.security.jwt.JwtTokenFilter;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 
 @Configuration
 @EnableWebSecurity
@@ -48,7 +49,17 @@ public class WebSecurityConfig {
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
                 // TODO: narrow down once RBAC is defined per endpoint
-                .anyRequest().permitAll()
+
+                // User controller: limit GET /users and /users/by-username/** to ADMIN, STAF_LAPANGAN, and STAF_TOKO
+                // GET /users/{id} can be accessed by the user themselves or by staff/admin
+                .requestMatchers(HttpMethod.GET, "/users", "/users/by-username/**")
+                    .hasAnyAuthority("ADMIN", "STAF_LAPANGAN", "STAF_TOKO")
+                .requestMatchers(HttpMethod.GET, "/users/**")// custom logic in controller to check if user is accessing their own data or is staff/admin
+                    .hasAnyAuthority("ADMIN", "STAF_LAPANGAN", "STAF_TOKO", "MEMBER", "GUEST", "OWNER")
+                
+                    
+                // Auth controller: allow all (login and register are public)
+                .requestMatchers("/auth/**").permitAll()
             )
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authenticationProvider(authenticationProvider)

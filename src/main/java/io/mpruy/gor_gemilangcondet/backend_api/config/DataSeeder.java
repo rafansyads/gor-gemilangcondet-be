@@ -31,5 +31,7 @@ public class DataSeeder implements ApplicationRunner {
                 log.info("Seeded role: {}", roleName);
             }
         }
+        // log.info("Data seeding complete.");
+        // log.info("CORS_ALLOWED_ORIGINS: {}", System.getenv("CORS_ALLOWED_ORIGINS"));
     }
 }
