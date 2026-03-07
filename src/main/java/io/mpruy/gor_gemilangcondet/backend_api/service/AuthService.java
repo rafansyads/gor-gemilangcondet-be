@@ -27,6 +27,7 @@ import io.mpruy.gor_gemilangcondet.backend_api.security.jwt.JwtUtils;
 import io.mpruy.gor_gemilangcondet.backend_api.security.service.JwtTokenBlacklist;
 import io.mpruy.gor_gemilangcondet.backend_api.security.service.RefreshTokenService;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.BadRequestException;
+import io.mpruy.gor_gemilangcondet.backend_api.exception.UnauthorizedException;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.ConflictException;
 import io.mpruy.gor_gemilangcondet.backend_api.service.mapper.AuthMapper;
 import io.mpruy.gor_gemilangcondet.backend_api.service.mapper.UserMapper;
@@ -47,13 +48,15 @@ public class AuthService {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
 
-    /** Roles that only privileged actors (admin portal) may assign during registration. */
+    /**
+     * Roles that only privileged actors (admin portal) may assign during
+     * registration.
+     */
     private static final Set<RoleName> ADMIN_ASSIGNABLE_ROLES = Set.of(
             RoleName.STAF_LAPANGAN,
             RoleName.STAF_TOKO,
             RoleName.OWNER,
-            RoleName.ADMIN
-    );
+            RoleName.ADMIN);
 
     // ──────────────────────────────────────────────────────────────────────────
     // Login
@@ -74,12 +77,34 @@ public class AuthService {
         SecurityContextHolder.getContext().setAuthentication(authentication);
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
 
-        String accessToken  = jwtUtils.generateAccessToken(userDetails);
+        String accessToken = jwtUtils.generateAccessToken(userDetails);
         String refreshToken = refreshTokenService.createRefreshToken(userDetails.getUsername());
 
         AuthResponse response = authMapper.toAuthResponse(accessToken, refreshToken, userDetails);
         response.setRedirectUrl(redirectUrl);
         return response;
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Login Admin (only allow users with admin/staff roles to log in)
+    // ──────────────────────────────────────────────────────────────────────────
+    /**
+     * Authenticates the user and issues access + refresh tokens, but only if the
+     * user has an admin/staff role.
+     *
+     * @param request     username + password
+     * @param redirectUrl optional frontend URL to echo back in the response
+     * @return {@link AuthResponse} carrying both tokens and the redirect URL
+     * @throws BadRequestException if credentials are valid but user does not have
+     *                             an admin/staff role
+     */
+    public AuthResponse loginAdmin(LoginRequest request, String redirectUrl) {
+        AuthResponse authResponse = login(request, redirectUrl);
+        String role = authResponse.getRole();
+        if (!ADMIN_ASSIGNABLE_ROLES.contains(RoleName.valueOf(role))) {
+            throw new UnauthorizedException("User does not have owner/admin/staff role: " + role);
+        }
+        return authResponse;
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -141,7 +166,8 @@ public class AuthService {
     /**
      * Blacklists the access token and revokes the refresh token.
      *
-     * @param authorizationHeader raw {@code Authorization} header value ("Bearer &lt;token&gt;")
+     * @param authorizationHeader raw {@code Authorization} header value ("Bearer
+     *                            &lt;token&gt;")
      */
     public void logout(String authorizationHeader) {
         if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
@@ -182,9 +208,9 @@ public class AuthService {
     // Helpers
     // ──────────────────────────────────────────────────────────────────────────
 
-
     /**
-     * Ensures the requested username and email are not already taken by another user.
+     * Ensures the requested username and email are not already taken by another
+     * user.
      * 
      * @param request registration request containing the desired username and email
      * @throws IllegalArgumentException if the username or email is already taken
@@ -199,7 +225,8 @@ public class AuthService {
     }
 
     /**
-     * Fetches the {@link Role} entity for the given {@link RoleName}, throwing an exception if not found.
+     * Fetches the {@link Role} entity for the given {@link RoleName}, throwing an
+     * exception if not found.
      * 
      * @param name the role name to look up
      * @return the corresponding Role entity
@@ -211,10 +238,12 @@ public class AuthService {
     }
 
     /**
-     * Builds a new User entity from the registration request and assigned role, encoding the password.
+     * Builds a new User entity from the registration request and assigned role,
+     * encoding the password.
      * 
-     * @param request the registration request containing username, email, and raw password
-     * @param role the Role entity to assign to the new user
+     * @param request the registration request containing username, email, and raw
+     *                password
+     * @param role    the Role entity to assign to the new user
      * @return a new User entity ready to be saved to the database
      */
     private User buildUser(RegisterRequest request, Role role) {
@@ -227,11 +256,13 @@ public class AuthService {
     }
 
     /**
-     * Validates password strength: minimum 8 characters, at least one uppercase letter,
+     * Validates password strength: minimum 8 characters, at least one uppercase
+     * letter,
      * and at least one digit.
      *
      * @param password the raw password to validate
-     * @throws IllegalArgumentException if the password does not meet the requirements
+     * @throws IllegalArgumentException if the password does not meet the
+     *                                  requirements
      */
     private void validatePassword(String password) {
         if (password == null || password.length() < 8) {
@@ -246,11 +277,13 @@ public class AuthService {
     }
 
     /**
-     * Parses and validates the requested admin role from the registration request, ensuring it is one of the allowed roles.
+     * Parses and validates the requested admin role from the registration request,
+     * ensuring it is one of the allowed roles.
      * 
      * @param rawRole the raw role name string from the registration request
      * @return the corresponding RoleName enum value if valid
-     * @throws IllegalArgumentException if the role is blank, unknown, or not allowed for admin registration
+     * @throws IllegalArgumentException if the role is blank, unknown, or not
+     *                                  allowed for admin registration
      */
     private RoleName parseAdminRole(String rawRole) {
         if (rawRole == null || rawRole.isBlank()) {

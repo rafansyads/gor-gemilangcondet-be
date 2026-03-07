@@ -48,6 +48,11 @@ public class GlobalExceptionHandlerController {
         return ResponseUtil.error("Authentication failed: " + ex.getMessage(), HttpStatus.UNAUTHORIZED);
     }
 
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<BaseResponseDto<Object>> handleUnauthorized(UnauthorizedException ex) {
+        return ResponseUtil.error(ex.getMessage(), HttpStatus.UNAUTHORIZED);
+    }
+
     @ExceptionHandler(ForbiddenException.class)
     public ResponseEntity<BaseResponseDto<Object>> handleForbidden(ForbiddenException ex) {
         return ResponseUtil.error(ex.getMessage(), HttpStatus.FORBIDDEN);

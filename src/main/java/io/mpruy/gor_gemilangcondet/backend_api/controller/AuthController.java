@@ -50,7 +50,34 @@ public class AuthController {
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // POST /auth/register  (public — always GUEST)
+    // POST /auth/login-admin
+    // ──────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Authenticate with username + password, but only for admin/staff accounts.
+     * Used for admin panel login where we want to prevent non-admin users from even
+     * attempting to log in.
+     * 
+     * @param request     wrapped {@link LoginRequest}
+     * @param redirectUrl optional frontend URL; if provided it is echoed in the
+     *                    {@link AuthResponse#getRedirectUrl()} field so the client
+     *                    knows where to navigate after a successful login
+     * @return 200 OK with {@link AuthResponse} if credentials are valid and user
+     *         has admin/staff role; 403 Forbidden if credentials are valid but user
+     *         does not have admin/staff role; 401 Unauthorized if credentials are
+     *         invalid
+     */
+    @PostMapping("/login-admin")
+    public ResponseEntity<BaseResponseDto<AuthResponse>> loginAdmin(
+            @Validated @RequestBody BaseRequestDto<LoginRequest> request,
+            @RequestParam(name = "redirect", required = false) String redirectUrl) {
+        AuthResponse authResponse = authService.loginAdmin(request.getData(), redirectUrl);
+        return ResponseUtil.success(authResponse, "Admin login successful", HttpStatus.OK)
+                .toBuilder().build();
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // POST /auth/register (public — always GUEST)
     // ──────────────────────────────────────────────────────────────────────────
 
     @PostMapping("/register")
@@ -62,7 +89,7 @@ public class AuthController {
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // POST /auth/register-admin  (privileged — STAF_LAPANGAN/STAF_TOKO/OWNER/ADMIN)
+    // POST /auth/register-admin (privileged — STAF_LAPANGAN/STAF_TOKO/OWNER/ADMIN)
     // ──────────────────────────────────────────────────────────────────────────
 
     @PostMapping("/register-admin")
