@@ -1,19 +1,25 @@
 package io.mpruy.gor_gemilangcondet.backend_api.controller;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
 import io.mpruy.gor_gemilangcondet.backend_api.dto.BaseRequestDto;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.BaseResponseDto;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.requests.LoginRequest;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.requests.RefreshTokenRequest;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.requests.RegisterRequest;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.responses.AuthResponse;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.responses.RegisterResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.service.AuthService;
 import io.mpruy.gor_gemilangcondet.backend_api.util.ResponseUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/auth")
@@ -54,11 +60,11 @@ public class AuthController {
     // ──────────────────────────────────────────────────────────────────────────
 
     @PostMapping("/register")
-    public ResponseEntity<BaseResponseDto<AuthResponse>> register(
+    public ResponseEntity<BaseResponseDto<RegisterResponse>> register(
             @Validated @RequestBody BaseRequestDto<RegisterRequest> request) {
         try {
-            AuthResponse authResponse = authService.register(request.getData());
-            return ResponseUtil.success(authResponse, "Registration successful", HttpStatus.CREATED)
+            RegisterResponse registerResponse = authService.register(request.getData());
+            return ResponseUtil.success(registerResponse, "Registration successful", HttpStatus.CREATED)
                     .toBuilder().build();
         } catch (IllegalArgumentException ex) {
             return ResponseUtil.error(ex.getMessage(), HttpStatus.CONFLICT);
@@ -74,12 +80,12 @@ public class AuthController {
     // ──────────────────────────────────────────────────────────────────────────
 
     @PostMapping("/register-admin")
-    public ResponseEntity<BaseResponseDto<AuthResponse>> registerAdmin(
+    public ResponseEntity<BaseResponseDto<RegisterResponse>> registerAdmin(
             @Validated @RequestBody BaseRequestDto<RegisterRequest> request) {
         try {
-            AuthResponse authResponse = authService.registerAdmin(request.getData());
+            RegisterResponse registerResponse = authService.registerAdmin(request.getData());
             return ResponseUtil.success(
-                    authResponse,
+                    registerResponse,
                     "Admin/staff account created successfully",
                     HttpStatus.CREATED)
                     .toBuilder().build();

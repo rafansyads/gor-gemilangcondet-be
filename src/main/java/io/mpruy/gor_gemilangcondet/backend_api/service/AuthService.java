@@ -1,20 +1,7 @@
 package io.mpruy.gor_gemilangcondet.backend_api.service;
 
-import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.requests.LoginRequest;
-import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.requests.RefreshTokenRequest;
-import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.requests.RegisterRequest;
-import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.responses.AuthResponse;
-import io.mpruy.gor_gemilangcondet.backend_api.entities.users.Role;
-import io.mpruy.gor_gemilangcondet.backend_api.entities.users.RoleName;
-import io.mpruy.gor_gemilangcondet.backend_api.entities.users.User;
-import io.mpruy.gor_gemilangcondet.backend_api.repository.RoleRepository;
-import io.mpruy.gor_gemilangcondet.backend_api.repository.UserRepository;
-import io.mpruy.gor_gemilangcondet.backend_api.security.UserDetailsImpl;
-import io.mpruy.gor_gemilangcondet.backend_api.security.jwt.JwtUtils;
-import io.mpruy.gor_gemilangcondet.backend_api.security.service.JwtTokenBlacklist;
-import io.mpruy.gor_gemilangcondet.backend_api.security.service.RefreshTokenService;
-import io.mpruy.gor_gemilangcondet.backend_api.service.mapper.AuthMapper;
-import lombok.RequiredArgsConstructor;
+import java.util.Set;
+
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -25,7 +12,23 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Set;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.requests.LoginRequest;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.requests.RefreshTokenRequest;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.requests.RegisterRequest;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.responses.AuthResponse;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.responses.RegisterResponse;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.users.Role;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.users.RoleName;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.users.User;
+import io.mpruy.gor_gemilangcondet.backend_api.repository.RoleRepository;
+import io.mpruy.gor_gemilangcondet.backend_api.repository.UserRepository;
+import io.mpruy.gor_gemilangcondet.backend_api.security.UserDetailsImpl;
+import io.mpruy.gor_gemilangcondet.backend_api.security.jwt.JwtUtils;
+import io.mpruy.gor_gemilangcondet.backend_api.security.service.JwtTokenBlacklist;
+import io.mpruy.gor_gemilangcondet.backend_api.security.service.RefreshTokenService;
+import io.mpruy.gor_gemilangcondet.backend_api.service.mapper.AuthMapper;
+import io.mpruy.gor_gemilangcondet.backend_api.service.mapper.UserMapper;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -37,6 +40,7 @@ public class AuthService {
     private final RefreshTokenService refreshTokenService;
     private final UserDetailsService userDetailsService;
     private final AuthMapper authMapper;
+    private final UserMapper userMapper;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
@@ -84,17 +88,21 @@ public class AuthService {
      * Self-registration endpoint. Always assigns the {@code GUEST} role.
      *
      * @param request username + email + password
-     * @return {@link AuthResponse} with tokens for the newly created user
+     * @return {@link RegisterResponse} with the created user and a success message
      */
     @Transactional
-    public AuthResponse register(RegisterRequest request) {
+    public RegisterResponse register(RegisterRequest request) {
         assertUsernameAndEmailFree(request);
+        validatePassword(request.getPassword());
 
         Role role = requireRole(RoleName.GUEST);
         User user = buildUser(request, role);
         userRepository.save(user);
 
-        return issueTokens(user);
+        return RegisterResponse.builder()
+                .user(userMapper.toDto(user))
+                .message("User " + user.getUsername() + " successfully created")
+                .build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -103,21 +111,25 @@ public class AuthService {
 
     /**
      * Admin-portal registration. {@code request.role} must be one of the
-     * {@link #ADMIN_ASSIGNABLE_ROLES}; falls back to {@code STAF_LAPANGAN} if blank.
+     * {@link #ADMIN_ASSIGNABLE_ROLES}.
      *
      * @param request username + email + password + role name
-     * @return {@link AuthResponse} with tokens for the newly created user
+     * @return {@link RegisterResponse} with the created user and a success message
      */
     @Transactional
-    public AuthResponse registerAdmin(RegisterRequest request) {
+    public RegisterResponse registerAdmin(RegisterRequest request) {
         assertUsernameAndEmailFree(request);
+        validatePassword(request.getPassword());
 
         RoleName roleName = parseAdminRole(request.getRole());
         Role role = requireRole(roleName);
         User user = buildUser(request, role);
         userRepository.save(user);
 
-        return issueTokens(user);
+        return RegisterResponse.builder()
+                .user(userMapper.toDto(user))
+                .message("User " + user.getUsername() + " successfully created")
+                .build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -213,16 +225,22 @@ public class AuthService {
     }
 
     /**
-     * Generates access and refresh tokens for the given user and constructs an AuthResponse.
-     * 
-     * @param user the User entity for whom to issue tokens
-     * @return an AuthResponse containing the issued tokens and user details
+     * Validates password strength: minimum 8 characters, at least one uppercase letter,
+     * and at least one digit.
+     *
+     * @param password the raw password to validate
+     * @throws IllegalArgumentException if the password does not meet the requirements
      */
-    private AuthResponse issueTokens(User user) {
-        UserDetailsImpl userDetails = new UserDetailsImpl(user);
-        String accessToken  = jwtUtils.generateAccessToken(userDetails);
-        String refreshToken = refreshTokenService.createRefreshToken(user.getUsername());
-        return authMapper.toAuthResponse(accessToken, refreshToken, userDetails);
+    private void validatePassword(String password) {
+        if (password == null || password.length() < 8) {
+            throw new IllegalArgumentException("Password must be at least 8 characters long.");
+        }
+        if (password.chars().noneMatch(Character::isUpperCase)) {
+            throw new IllegalArgumentException("Password must contain at least one uppercase letter.");
+        }
+        if (password.chars().noneMatch(Character::isDigit)) {
+            throw new IllegalArgumentException("Password must contain at least one digit.");
+        }
     }
 
     /**
