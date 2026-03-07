@@ -45,7 +45,7 @@ public class AuthController {
             @Validated @RequestBody BaseRequestDto<LoginRequest> request,
             @RequestParam(name = "redirect", required = false) String redirectUrl) {
         AuthResponse authResponse = authService.login(request.getData(), redirectUrl);
-        return ResponseUtil.success(authResponse, "Login successful", HttpStatus.OK)
+        return ResponseUtil.success(authResponse, "Berhasil login", HttpStatus.OK)
                 .toBuilder().build();
     }
 
@@ -72,7 +72,7 @@ public class AuthController {
             @Validated @RequestBody BaseRequestDto<LoginRequest> request,
             @RequestParam(name = "redirect", required = false) String redirectUrl) {
         AuthResponse authResponse = authService.loginAdmin(request.getData(), redirectUrl);
-        return ResponseUtil.success(authResponse, "Admin login successful", HttpStatus.OK)
+        return ResponseUtil.success(authResponse, "Login admin berhasil", HttpStatus.OK)
                 .toBuilder().build();
     }
 
@@ -84,7 +84,7 @@ public class AuthController {
     public ResponseEntity<BaseResponseDto<RegisterResponse>> register(
             @Validated @RequestBody BaseRequestDto<RegisterRequest> request) {
         RegisterResponse registerResponse = authService.register(request.getData());
-        return ResponseUtil.success(registerResponse, "Registration successful", HttpStatus.CREATED)
+        return ResponseUtil.success(registerResponse, "Registrasi berhasil", HttpStatus.CREATED)
                 .toBuilder().build();
     }
 
@@ -98,7 +98,7 @@ public class AuthController {
         RegisterResponse registerResponse = authService.registerAdmin(request.getData());
         return ResponseUtil.success(
                 registerResponse,
-                "Admin/staff account created successfully",
+                "Akun admin/staff berhasil dibuat",
                 HttpStatus.CREATED)
                 .toBuilder().build();
     }
@@ -111,7 +111,7 @@ public class AuthController {
     public ResponseEntity<BaseResponseDto<String>> logout(HttpServletRequest httpRequest) {
         String authHeader = httpRequest.getHeader("Authorization");
         authService.logout(authHeader);
-        return ResponseUtil.success("Logged out successfully", "Logout successful", HttpStatus.OK)
+        return ResponseUtil.success("Logout berhasil", "Logout berhasil", HttpStatus.OK)
                 .toBuilder().build();
     }
 
@@ -123,7 +123,7 @@ public class AuthController {
     public ResponseEntity<BaseResponseDto<AuthResponse>> refresh(
             @Validated @RequestBody BaseRequestDto<RefreshTokenRequest> request) {
         AuthResponse authResponse = authService.refreshToken(request.getData());
-        return ResponseUtil.success(authResponse, "Token refreshed", HttpStatus.OK)
+        return ResponseUtil.success(authResponse, "Token berhasil diperbarui", HttpStatus.OK)
                 .toBuilder().build();
     }
 }

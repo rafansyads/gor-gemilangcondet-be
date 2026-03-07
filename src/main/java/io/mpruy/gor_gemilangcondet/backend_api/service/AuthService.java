@@ -102,7 +102,7 @@ public class AuthService {
         AuthResponse authResponse = login(request, redirectUrl);
         String role = authResponse.getRole();
         if (!ADMIN_ASSIGNABLE_ROLES.contains(RoleName.valueOf(role))) {
-            throw new UnauthorizedException("User does not have owner/admin/staff role: " + role);
+            throw new UnauthorizedException("Pengguna tidak memiliki peran owner/admin/staff: " + role);
         }
         return authResponse;
     }
@@ -128,7 +128,7 @@ public class AuthService {
 
         return RegisterResponse.builder()
                 .user(userMapper.toDto(user))
-                .message("User " + user.getUsername() + " successfully created")
+                .message("Pengguna " + user.getUsername() + " berhasil dibuat")
                 .build();
     }
 
@@ -155,7 +155,7 @@ public class AuthService {
 
         return RegisterResponse.builder()
                 .user(userMapper.toDto(user))
-                .message("User " + user.getUsername() + " successfully created")
+                .message("Pengguna " + user.getUsername() + " berhasil dibuat")
                 .build();
     }
 
@@ -217,10 +217,10 @@ public class AuthService {
      */
     private void assertUsernameAndEmailFree(RegisterRequest request) {
         if (userRepository.existsByUsername(request.getUsername())) {
-            throw new ConflictException("Username is already taken: " + request.getUsername());
+            throw new ConflictException("Username sudah digunakan: " + request.getUsername());
         }
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new ConflictException("Email is already registered: " + request.getEmail());
+            throw new ConflictException("Email sudah terdaftar: " + request.getEmail());
         }
     }
 
@@ -234,7 +234,7 @@ public class AuthService {
      */
     private Role requireRole(RoleName name) {
         return roleRepository.findByRoleName(name)
-                .orElseThrow(() -> new IllegalStateException("Role not found in database: " + name));
+                .orElseThrow(() -> new IllegalStateException("Peran tidak ditemukan di database: " + name));
     }
 
     /**
@@ -266,22 +266,22 @@ public class AuthService {
      */
     private void validatePassword(String password) {
         if (password == null || password.length() < 8) {
-            throw new BadRequestException("Password must be at least 8 characters long.");
+            throw new BadRequestException("Password harus terdiri dari minimal 8 karakter.");
         }
         if (password.chars().noneMatch(Character::isUpperCase)) {
-            throw new BadRequestException("Password must contain at least one uppercase letter.");
+            throw new BadRequestException("Password harus mengandung setidaknya satu huruf kapital.");
         }
         if (password.chars().noneMatch(Character::isDigit)) {
-            throw new BadRequestException("Password must contain at least one digit.");
+            throw new BadRequestException("Password harus mengandung setidaknya satu angka.");
         }
         if (password.chars().anyMatch(Character::isWhitespace)) {
-            throw new BadRequestException("Password must not contain whitespace.");
+            throw new BadRequestException("Password tidak boleh mengandung karakter spasi.");
         }
         // Special characters are not allowed, only "_", "-", "@", and "." are permitted
         if (password.chars().anyMatch(ch -> !Character.isLetterOrDigit(ch)
                 && ch != '_' && ch != '-' && ch != '@' && ch != '.')) {
             throw new BadRequestException(
-                    "Password contains invalid characters. Only letters, digits, and _ - @ . are allowed.");
+                    "Password mengandung karakter tidak valid. Hanya huruf, angka, dan _ - @ . yang diperbolehkan.");
         }
     }
 
@@ -296,17 +296,17 @@ public class AuthService {
      */
     private RoleName parseAdminRole(String rawRole) {
         if (rawRole == null || rawRole.isBlank()) {
-            throw new BadRequestException("Role is required for admin registration.");
+            throw new BadRequestException("Peran diperlukan untuk registrasi admin.");
         }
         try {
             RoleName parsed = RoleName.valueOf(rawRole.toUpperCase());
             if (!ADMIN_ASSIGNABLE_ROLES.contains(parsed)) {
                 throw new BadRequestException(
-                        "Role '" + rawRole + "' cannot be assigned via admin registration.");
+                        "Peran '" + rawRole + "' tidak dapat diberikan melalui registrasi admin.");
             }
             return parsed;
         } catch (IllegalArgumentException e) {
-            throw new BadRequestException("Unknown role: " + rawRole);
+            throw new BadRequestException("Role " + rawRole + " tidak valid.");
         }
     }
 }

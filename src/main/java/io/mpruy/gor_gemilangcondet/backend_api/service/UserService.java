@@ -37,14 +37,14 @@ public class UserService {
     @Transactional(readOnly = true)
     public UserDto getUserById(UUID id) {
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Pengguna tidak ditemukan: " + id));
         return toDto(user);
     }
 
     @Transactional(readOnly = true)
     public UserDto getUserByUsername(String username) {
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + username));
+                .orElseThrow(() -> new ResourceNotFoundException("Pengguna tidak ditemukan: " + username));
         return toDto(user);
     }
 
@@ -67,7 +67,7 @@ public class UserService {
 
         // Re-fetch to get a managed entity in the current persistence context
         User user = userRepository.findById(currentUser.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Pengguna tidak ditemukan"));
 
         // Check uniqueness — exclude the current user's own ID
         if (userRepository.existsByUsernameAndIdNot(request.getUsername(), user.getId())) {

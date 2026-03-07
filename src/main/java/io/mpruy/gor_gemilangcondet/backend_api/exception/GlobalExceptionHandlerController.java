@@ -45,7 +45,7 @@ public class GlobalExceptionHandlerController {
 
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<BaseResponseDto<Object>> handleAuthentication(AuthenticationException ex) {
-        return ResponseUtil.error("Authentication failed: " + ex.getMessage(), HttpStatus.UNAUTHORIZED);
+        return ResponseUtil.error("Autentikasi gagal: " + ex.getMessage(), HttpStatus.UNAUTHORIZED);
     }
 
     @ExceptionHandler(UnauthorizedException.class)
@@ -74,7 +74,7 @@ public class GlobalExceptionHandlerController {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<BaseResponseDto<Object>> handleGeneral(Exception ex) {
-        return ResponseUtil.error("An unexpected error occurred: " + ex.getMessage(),
+        return ResponseUtil.error("Terjadi kesalahan tak terduga: " + ex.getMessage(),
                 HttpStatus.INTERNAL_SERVER_ERROR);
     }
 }
