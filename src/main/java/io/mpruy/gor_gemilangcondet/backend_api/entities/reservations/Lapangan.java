@@ -19,6 +19,9 @@ public class Lapangan {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    @Column(nullable = false)
+    private String name;
+
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
@@ -34,4 +37,7 @@ public class Lapangan {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private LapanganStatus status;
+
+    @Column(nullable = false)
+    private double tarifPerJam;
 }
