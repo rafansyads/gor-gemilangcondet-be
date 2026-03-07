@@ -39,10 +39,19 @@ public class DataSeeder implements ApplicationRunner {
     @Transactional
     public void run(ApplicationArguments args) {
         seedRoles();
-        seedLapangan();
-        seedAlatOlahraga();
+        seedLapangan(); // nantinya tergantung GOR
+        seedAlatOlahraga(); // nantinya tergantung GOR, bisa jadi tidak ada alat olahraga yang disewakan
     }
 
+    /**
+     * Checks each RoleName enum value against the database and inserts any missing roles.
+     * This method is idempotent and can be safely run on every application startup without
+     * creating duplicate entries. It ensures that the application always has the necessary
+     * roles defined for proper authorization handling.
+     * 
+     * @see RoleName
+     * @see RoleRepository
+     */
     private void seedRoles() {
         for (RoleName roleName : RoleName.values()) {
             if (roleRepository.findByRoleName(roleName).isEmpty()) {
