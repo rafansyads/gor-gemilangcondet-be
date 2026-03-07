@@ -2,6 +2,7 @@ package io.mpruy.gor_gemilangcondet.backend_api.exception;
 
 import java.util.stream.Collectors;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.AuthenticationException;
@@ -58,6 +59,12 @@ public class GlobalExceptionHandlerController {
                 .map(FieldError::getDefaultMessage)
                 .collect(Collectors.joining("; "));
         return ResponseUtil.error(message, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<BaseResponseDto<Object>> handleDataIntegrity(DataIntegrityViolationException ex) {
+        return ResponseUtil.error("Data constraint violation. Operasi tidak dapat dilakukan.",
+                HttpStatus.CONFLICT);
     }
 
     @ExceptionHandler(Exception.class)
