@@ -33,15 +33,9 @@ public class ReservasiController {
 
     @GetMapping
     public ResponseEntity<BaseResponseDto<List<ReservasiResponse>>> getAllBookings() {
-        try {
-            List<ReservasiResponse> bookings = reservasiService.getAllReservations();
-            return ResponseUtil.success(bookings, "Data reservasi berhasil diambil", HttpStatus.OK)
-                    .toBuilder().build();
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Gagal mengambil data reservasi: " + ex.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        List<ReservasiResponse> bookings = reservasiService.getAllReservations();
+        return ResponseUtil.success(bookings, "Data reservasi berhasil diambil", HttpStatus.OK)
+                .toBuilder().build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -50,17 +44,9 @@ public class ReservasiController {
 
     @GetMapping("/{id}")
     public ResponseEntity<BaseResponseDto<ReservasiResponse>> getBookingById(@PathVariable UUID id) {
-        try {
-            ReservasiResponse booking = reservasiService.getReservationById(id);
-            return ResponseUtil.success(booking, "Data reservasi berhasil diambil", HttpStatus.OK)
-                    .toBuilder().build();
-        } catch (IllegalArgumentException ex) {
-            return ResponseUtil.error(ex.getMessage(), HttpStatus.NOT_FOUND);
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Gagal mengambil data reservasi: " + ex.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        ReservasiResponse booking = reservasiService.getReservationById(id);
+        return ResponseUtil.success(booking, "Data reservasi berhasil diambil", HttpStatus.OK)
+                .toBuilder().build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -70,15 +56,9 @@ public class ReservasiController {
     @GetMapping("/user/{userId}")
     public ResponseEntity<BaseResponseDto<List<ReservasiResponse>>> getBookingsByUserId(
             @PathVariable UUID userId) {
-        try {
-            List<ReservasiResponse> bookings = reservasiService.getReservationsByUserId(userId);
-            return ResponseUtil.success(bookings, "Data reservasi user berhasil diambil", HttpStatus.OK)
-                    .toBuilder().build();
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Gagal mengambil data reservasi user: " + ex.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        List<ReservasiResponse> bookings = reservasiService.getReservationsByUserId(userId);
+        return ResponseUtil.success(bookings, "Data reservasi user berhasil diambil", HttpStatus.OK)
+                .toBuilder().build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -95,16 +75,10 @@ public class ReservasiController {
     public ResponseEntity<BaseResponseDto<List<CourtAvailabilityResponse>>> getAvailability(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestParam(required = false) LapanganType type) {
-        try {
-            List<CourtAvailabilityResponse> availability = reservasiService.getAvailability(date, type);
-            return ResponseUtil.success(availability,
-                    "Data ketersediaan lapangan berhasil diambil", HttpStatus.OK)
-                    .toBuilder().build();
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Gagal mengambil data ketersediaan: " + ex.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        List<CourtAvailabilityResponse> availability = reservasiService.getAvailability(date, type);
+        return ResponseUtil.success(availability,
+                "Data ketersediaan lapangan berhasil diambil", HttpStatus.OK)
+                .toBuilder().build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -123,17 +97,11 @@ public class ReservasiController {
             @RequestParam LapanganType courtType,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
-        try {
-            List<AlatOlahragaAvailabilityResponse> availability =
-                    reservasiService.getEquipmentAvailability(courtType, start, end);
-            return ResponseUtil.success(availability,
-                    "Data ketersediaan alat olahraga berhasil diambil", HttpStatus.OK)
-                    .toBuilder().build();
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Gagal mengambil data ketersediaan alat: " + ex.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        List<AlatOlahragaAvailabilityResponse> availability =
+                reservasiService.getEquipmentAvailability(courtType, start, end);
+        return ResponseUtil.success(availability,
+                "Data ketersediaan alat olahraga berhasil diambil", HttpStatus.OK)
+                .toBuilder().build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -147,17 +115,9 @@ public class ReservasiController {
     @PostMapping("/reserve")
     public ResponseEntity<BaseResponseDto<ReservasiResponse>> createReservation(
             @Validated @RequestBody BaseRequestDto<CreateReservasiRequest> request) {
-        try {
-            ReservasiResponse response = reservasiService.createReservation(request.getData());
-            return ResponseUtil.success(response, "Reservasi berhasil dibuat", HttpStatus.CREATED)
-                    .toBuilder().build();
-        } catch (IllegalArgumentException ex) {
-            return ResponseUtil.error(ex.getMessage(), HttpStatus.BAD_REQUEST);
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Gagal membuat reservasi: " + ex.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        ReservasiResponse response = reservasiService.createReservation(request.getData());
+        return ResponseUtil.success(response, "Reservasi berhasil dibuat", HttpStatus.CREATED)
+                .toBuilder().build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -172,16 +132,8 @@ public class ReservasiController {
     public ResponseEntity<BaseResponseDto<ReservasiResponse>> rescheduleReservation(
             @PathVariable UUID id,
             @Validated @RequestBody BaseRequestDto<RescheduleReservasiRequest> request) {
-        try {
-            ReservasiResponse response = reservasiService.rescheduleReservation(id, request.getData());
-            return ResponseUtil.success(response, "Reservasi berhasil dijadwal ulang", HttpStatus.OK)
-                    .toBuilder().build();
-        } catch (IllegalArgumentException ex) {
-            return ResponseUtil.error(ex.getMessage(), HttpStatus.BAD_REQUEST);
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Gagal menjadwal ulang reservasi: " + ex.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        ReservasiResponse response = reservasiService.rescheduleReservation(id, request.getData());
+        return ResponseUtil.success(response, "Reservasi berhasil dijadwal ulang", HttpStatus.OK)
+                .toBuilder().build();
     }
 }

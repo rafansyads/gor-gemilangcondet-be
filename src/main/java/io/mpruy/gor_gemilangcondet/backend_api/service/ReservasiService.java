@@ -6,6 +6,8 @@ import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.*;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.AlatOlahraga;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.AlatOlahragaStatus;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.BarangType;
+import io.mpruy.gor_gemilangcondet.backend_api.exception.BadRequestException;
+import io.mpruy.gor_gemilangcondet.backend_api.exception.ResourceNotFoundException;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.AlatOlahragaRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.LapanganRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.ReservasiRepository;
@@ -246,13 +248,13 @@ public class ReservasiService {
 
                 // 1. Validate: reservation date must not be in the past
                 if (request.getReservationStart().isBefore(now)) {
-                        throw new IllegalArgumentException("Tanggal reservasi tidak boleh di masa lalu");
+                        throw new BadRequestException("Tanggal reservasi tidak boleh di masa lalu");
                 }
 
                 // 2. Validate: reservation start must be on the hour
                 if (request.getReservationStart().getMinute() != 0 ||
                                 request.getReservationStart().getSecond() != 0) {
-                        throw new IllegalArgumentException(
+                        throw new BadRequestException(
                                         "Waktu reservasi harus dimulai pada jam tepat (contoh: 08:00, 09:00)");
                 }
 
@@ -260,7 +262,7 @@ public class ReservasiService {
                 int startHour = request.getReservationStart().getHour();
                 int endHour = startHour + request.getDurationInHours();
                 if (startHour < OPENING_HOUR || endHour > CLOSING_HOUR) {
-                        throw new IllegalArgumentException(
+                        throw new BadRequestException(
                                         String.format("Jam operasional GOR: %02d:00 - %02d:00", OPENING_HOUR,
                                                         CLOSING_HOUR));
                 }
@@ -268,11 +270,11 @@ public class ReservasiService {
                 // 4. Lock the court (PESSIMISTIC_WRITE → SELECT ... FOR UPDATE)
                 // This prevents race conditions when two users book simultaneously
                 Lapangan lapangan = lapanganRepository.findByIdWithPessimisticLock(request.getLapanganId())
-                                .orElseThrow(() -> new IllegalArgumentException("Lapangan tidak ditemukan"));
+                                .orElseThrow(() -> new ResourceNotFoundException("Lapangan tidak ditemukan"));
 
                 // 5. Check court status
                 if (lapangan.getStatus() != LapanganStatus.TERSEDIA) {
-                        throw new IllegalArgumentException(
+                        throw new BadRequestException(
                                         "Lapangan sedang tidak tersedia (status: " + lapangan.getStatus() + ")");
                 }
 
@@ -284,7 +286,7 @@ public class ReservasiService {
                 if (lapangan.getMaintenanceStart() != null && lapangan.getMaintenanceEnd() != null) {
                         if (lapangan.getMaintenanceStart().isBefore(reservationEnd) &&
                                         lapangan.getMaintenanceEnd().isAfter(request.getReservationStart())) {
-                                throw new IllegalArgumentException(
+                                throw new BadRequestException(
                                                 "Lapangan sedang dalam perbaikan pada waktu yang dipilih");
                         }
                 }
@@ -293,7 +295,7 @@ public class ReservasiService {
                 List<Reservasi> overlapping = reservasiRepository.findOverlappingReservations(
                                 lapangan.getId(), request.getReservationStart(), reservationEnd, INACTIVE_STATUSES);
                 if (!overlapping.isEmpty()) {
-                        throw new IllegalArgumentException("Jadwal lapangan sudah terisi pada waktu yang dipilih");
+                        throw new BadRequestException("Jadwal lapangan sudah terisi pada waktu yang dipilih");
                 }
 
                 // 9. Process equipment rental
@@ -347,32 +349,32 @@ public class ReservasiService {
 
                 // 1. Find existing reservation
                 Reservasi reservasi = reservasiRepository.findByIdWithLapangan(reservasiId)
-                                .orElseThrow(() -> new IllegalArgumentException("Reservasi tidak ditemukan"));
+                                .orElseThrow(() -> new ResourceNotFoundException("Reservasi tidak ditemukan"));
 
                 // 2. Validate reservation can be rescheduled
                 if (reservasi.getStatus() == ReservasiStatus.DIBATALKAN ||
                                 reservasi.getStatus() == ReservasiStatus.SELESAI) {
-                        throw new IllegalArgumentException(
+                        throw new BadRequestException(
                                         "Reservasi yang sudah " + reservasi.getStatus()
                                                         + " tidak dapat dijadwal ulang");
                 }
 
                 // 3. Validate: new date must not be in the past
                 if (request.getNewReservationStart().isBefore(now)) {
-                        throw new IllegalArgumentException("Tanggal reservasi baru tidak boleh di masa lalu");
+                        throw new BadRequestException("Tanggal reservasi baru tidak boleh di masa lalu");
                 }
 
                 // 4. Validate: must be on the hour
                 if (request.getNewReservationStart().getMinute() != 0 ||
                                 request.getNewReservationStart().getSecond() != 0) {
-                        throw new IllegalArgumentException("Waktu reservasi harus dimulai pada jam tepat");
+                        throw new BadRequestException("Waktu reservasi harus dimulai pada jam tepat");
                 }
 
                 // 5. Validate: within operating hours
                 int startHour = request.getNewReservationStart().getHour();
                 int endHour = startHour + request.getDurationInHours();
                 if (startHour < OPENING_HOUR || endHour > CLOSING_HOUR) {
-                        throw new IllegalArgumentException(
+                        throw new BadRequestException(
                                         String.format("Jam operasional GOR: %02d:00 - %02d:00", OPENING_HOUR,
                                                         CLOSING_HOUR));
                 }
@@ -380,7 +382,7 @@ public class ReservasiService {
                 // 6. Lock the court
                 Lapangan lapangan = lapanganRepository.findByIdWithPessimisticLock(
                                 reservasi.getLapangan().getId())
-                                .orElseThrow(() -> new IllegalArgumentException("Lapangan tidak ditemukan"));
+                                .orElseThrow(() -> new ResourceNotFoundException("Lapangan tidak ditemukan"));
 
                 // 7. Calculate new end time
                 LocalDateTime newEnd = request.getNewReservationStart()
@@ -392,7 +394,7 @@ public class ReservasiService {
                 overlapping.removeIf(r -> r.getId().equals(reservasiId));
 
                 if (!overlapping.isEmpty()) {
-                        throw new IllegalArgumentException("Jadwal lapangan sudah terisi pada waktu baru yang dipilih");
+                        throw new BadRequestException("Jadwal lapangan sudah terisi pada waktu baru yang dipilih");
                 }
 
                 // 9. Recalculate cost
@@ -433,7 +435,7 @@ public class ReservasiService {
         @Transactional
         public LapanganResponse updateCourt(UUID id, UpdateLapanganRequest request) {
                 Lapangan lapangan = lapanganRepository.findById(id)
-                                .orElseThrow(() -> new IllegalArgumentException("Lapangan tidak ditemukan: " + id));
+                                .orElseThrow(() -> new ResourceNotFoundException("Lapangan tidak ditemukan: " + id));
                 lapangan.setName(request.getName());
                 lapangan.setType(request.getType());
                 lapangan.setTarifPerJam(request.getTarifPerJam());
@@ -445,13 +447,13 @@ public class ReservasiService {
         @Transactional
         public void deleteCourt(UUID id) {
                 Lapangan lapangan = lapanganRepository.findById(id)
-                                .orElseThrow(() -> new IllegalArgumentException("Lapangan tidak ditemukan: " + id));
+                                .orElseThrow(() -> new ResourceNotFoundException("Lapangan tidak ditemukan: " + id));
                 // Check if court has active reservations
                 LocalDateTime now = LocalDateTime.now(ZONE_JAKARTA);
                 List<Reservasi> active = reservasiRepository.findOverlappingReservations(
                                 id, now, now.plusYears(1), INACTIVE_STATUSES);
                 if (!active.isEmpty()) {
-                        throw new IllegalArgumentException(
+                        throw new BadRequestException(
                                         "Tidak dapat menghapus lapangan yang masih memiliki reservasi aktif");
                 }
                 lapanganRepository.delete(lapangan);
@@ -460,7 +462,7 @@ public class ReservasiService {
         @Transactional
         public LapanganResponse updateCourtStatus(UUID id, LapanganStatus newStatus) {
                 Lapangan lapangan = lapanganRepository.findById(id)
-                                .orElseThrow(() -> new IllegalArgumentException("Lapangan tidak ditemukan: " + id));
+                                .orElseThrow(() -> new ResourceNotFoundException("Lapangan tidak ditemukan: " + id));
                 lapangan.setStatus(newStatus);
                 lapangan.setUpdatedAt(LocalDateTime.now(ZONE_JAKARTA));
                 lapanganRepository.save(lapangan);
@@ -481,7 +483,7 @@ public class ReservasiService {
         @Transactional(readOnly = true)
         public ReservasiResponse getReservationById(UUID id) {
                 Reservasi reservasi = reservasiRepository.findByIdWithLapangan(id)
-                                .orElseThrow(() -> new IllegalArgumentException("Reservasi tidak ditemukan: " + id));
+                                .orElseThrow(() -> new ResourceNotFoundException("Reservasi tidak ditemukan: " + id));
                 return toReservasiResponse(reservasi);
         }
 
@@ -519,11 +521,11 @@ public class ReservasiService {
 
                 for (RentItemRequest item : rentItems) {
                         AlatOlahraga equipment = alatOlahragaRepository.findById(item.getAlatOlahragaId())
-                                        .orElseThrow(() -> new IllegalArgumentException(
+                                        .orElseThrow(() -> new ResourceNotFoundException(
                                                         "Alat olahraga tidak ditemukan: " + item.getAlatOlahragaId()));
 
                         if (equipment.getStatus() != AlatOlahragaStatus.TERSEDIA) {
-                                throw new IllegalArgumentException(
+                                throw new BadRequestException(
                                                 "Alat olahraga '" + equipment.getName() + "' sedang tidak tersedia");
                         }
 
@@ -531,7 +533,7 @@ public class ReservasiService {
                         long available = equipment.getStock() - currentlyRented;
 
                         if (item.getQuantity() > available) {
-                                throw new IllegalArgumentException(
+                                throw new BadRequestException(
                                                 String.format("Stok '%s' tidak mencukupi. Tersedia: %d, Diminta: %d",
                                                                 equipment.getName(), available, item.getQuantity()));
                         }

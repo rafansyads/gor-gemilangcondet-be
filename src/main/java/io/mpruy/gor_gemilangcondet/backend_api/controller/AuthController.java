@@ -1,19 +1,25 @@
 package io.mpruy.gor_gemilangcondet.backend_api.controller;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
 import io.mpruy.gor_gemilangcondet.backend_api.dto.BaseRequestDto;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.BaseResponseDto;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.requests.LoginRequest;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.requests.RefreshTokenRequest;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.requests.RegisterRequest;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.responses.AuthResponse;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.responses.RegisterResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.service.AuthService;
 import io.mpruy.gor_gemilangcondet.backend_api.util.ResponseUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/auth")
@@ -38,58 +44,63 @@ public class AuthController {
     public ResponseEntity<BaseResponseDto<AuthResponse>> login(
             @Validated @RequestBody BaseRequestDto<LoginRequest> request,
             @RequestParam(name = "redirect", required = false) String redirectUrl) {
-        try {
-            AuthResponse authResponse = authService.login(request.getData(), redirectUrl);
-            return ResponseUtil.success(authResponse, "Login successful", HttpStatus.OK)
-                    .toBuilder().build();
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Login failed: " + ex.getMessage(),
-                    HttpStatus.UNAUTHORIZED);
-        }
+        AuthResponse authResponse = authService.login(request.getData(), redirectUrl);
+        return ResponseUtil.success(authResponse, "Berhasil login", HttpStatus.OK)
+                .toBuilder().build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // POST /auth/register  (public — always GUEST)
+    // POST /auth/login-admin
+    // ──────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Authenticate with username + password, but only for admin/staff accounts.
+     * Used for admin panel login where we want to prevent non-admin users from even
+     * attempting to log in.
+     * 
+     * @param request     wrapped {@link LoginRequest}
+     * @param redirectUrl optional frontend URL; if provided it is echoed in the
+     *                    {@link AuthResponse#getRedirectUrl()} field so the client
+     *                    knows where to navigate after a successful login
+     * @return 200 OK with {@link AuthResponse} if credentials are valid and user
+     *         has admin/staff role; 403 Forbidden if credentials are valid but user
+     *         does not have admin/staff role; 401 Unauthorized if credentials are
+     *         invalid
+     */
+    @PostMapping("/login-admin")
+    public ResponseEntity<BaseResponseDto<AuthResponse>> loginAdmin(
+            @Validated @RequestBody BaseRequestDto<LoginRequest> request,
+            @RequestParam(name = "redirect", required = false) String redirectUrl) {
+        AuthResponse authResponse = authService.loginAdmin(request.getData(), redirectUrl);
+        return ResponseUtil.success(authResponse, "Login admin berhasil", HttpStatus.OK)
+                .toBuilder().build();
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // POST /auth/register (public — always GUEST)
     // ──────────────────────────────────────────────────────────────────────────
 
     @PostMapping("/register")
-    public ResponseEntity<BaseResponseDto<AuthResponse>> register(
+    public ResponseEntity<BaseResponseDto<RegisterResponse>> register(
             @Validated @RequestBody BaseRequestDto<RegisterRequest> request) {
-        try {
-            AuthResponse authResponse = authService.register(request.getData());
-            return ResponseUtil.success(authResponse, "Registration successful", HttpStatus.CREATED)
-                    .toBuilder().build();
-        } catch (IllegalArgumentException ex) {
-            return ResponseUtil.error(ex.getMessage(), HttpStatus.CONFLICT);
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Registration failed: " + ex.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        RegisterResponse registerResponse = authService.register(request.getData());
+        return ResponseUtil.success(registerResponse, "Registrasi berhasil", HttpStatus.CREATED)
+                .toBuilder().build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // POST /auth/register-admin  (privileged — STAF_LAPANGAN/STAF_TOKO/OWNER/ADMIN)
+    // POST /auth/register-admin (privileged — STAF_LAPANGAN/STAF_TOKO/OWNER/ADMIN)
     // ──────────────────────────────────────────────────────────────────────────
 
     @PostMapping("/register-admin")
-    public ResponseEntity<BaseResponseDto<AuthResponse>> registerAdmin(
+    public ResponseEntity<BaseResponseDto<RegisterResponse>> registerAdmin(
             @Validated @RequestBody BaseRequestDto<RegisterRequest> request) {
-        try {
-            AuthResponse authResponse = authService.registerAdmin(request.getData());
-            return ResponseUtil.success(
-                    authResponse,
-                    "Admin/staff account created successfully",
-                    HttpStatus.CREATED)
-                    .toBuilder().build();
-        } catch (IllegalArgumentException ex) {
-            return ResponseUtil.error(ex.getMessage(), HttpStatus.BAD_REQUEST);
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Admin registration failed: " + ex.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        RegisterResponse registerResponse = authService.registerAdmin(request.getData());
+        return ResponseUtil.success(
+                registerResponse,
+                "Akun admin/staff berhasil dibuat",
+                HttpStatus.CREATED)
+                .toBuilder().build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -98,16 +109,10 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<BaseResponseDto<String>> logout(HttpServletRequest httpRequest) {
-        try {
-            String authHeader = httpRequest.getHeader("Authorization");
-            authService.logout(authHeader);
-            return ResponseUtil.success("Logged out successfully", "Logout successful", HttpStatus.OK)
-                    .toBuilder().build();
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Logout failed: " + ex.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        String authHeader = httpRequest.getHeader("Authorization");
+        authService.logout(authHeader);
+        return ResponseUtil.success("Logout berhasil", "Logout berhasil", HttpStatus.OK)
+                .toBuilder().build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -117,16 +122,8 @@ public class AuthController {
     @PostMapping("/refresh")
     public ResponseEntity<BaseResponseDto<AuthResponse>> refresh(
             @Validated @RequestBody BaseRequestDto<RefreshTokenRequest> request) {
-        try {
-            AuthResponse authResponse = authService.refreshToken(request.getData());
-            return ResponseUtil.success(authResponse, "Token refreshed", HttpStatus.OK)
-                    .toBuilder().build();
-        } catch (IllegalArgumentException ex) {
-            return ResponseUtil.error(ex.getMessage(), HttpStatus.UNAUTHORIZED);
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Token refresh failed: " + ex.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        AuthResponse authResponse = authService.refreshToken(request.getData());
+        return ResponseUtil.success(authResponse, "Token berhasil diperbarui", HttpStatus.OK)
+                .toBuilder().build();
     }
 }

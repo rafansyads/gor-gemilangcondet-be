@@ -1,71 +1,68 @@
 server:
-  port: ${SERVER_PORT:8080}
+  port: 0
   servlet:
     context-path: /api
 
 spring:
   application:
-    name: backend-api
+    name: backend-api-test
 
-  web:
-    # Jika nanti ada error, tampilkan pesannya (berguna buat API)
-    error:
-      include-message: always
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
 
-  # Cache (dipakai Bucket4j untuk rate limiting)
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+
   cache:
     type: jcache
     cache-names: rate-limit-buckets
     jcache:
       provider: com.github.benmanes.caffeine.jcache.spi.CaffeineCachingProvider
 
-  # Pengaturan Format Tanggal (Penting buat Booking)
   jackson:
     date-format: dd-MM-yyyy HH:mm:ss
     time-zone: Asia/Jakarta
 
-  # Driver Database (Sama-sama Postgres buat Dev & Prod)
-  datasource:
-    driver-class-name: org.postgresql.Driver
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
 
-  jpa:
-    open-in-view: false
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
+app:
+  jwt:
+    secret: TestSecretKeyForJwtTokensThatMustBeLongEnough1234567890
+    expiration: 86400000
+  upload:
+    dir: build/test-uploads/payment-proofs
 
-  # Default Profile: Kalau tidak disetting apa-apa, anggap mode DEV
-  profiles:
-    active: dev
-
-# Bucket4j Configuration untuk Rate Limiting
 bucket4j:
   enabled: true
   filters:
     - cache-name: rate-limit-buckets
       filter-method: servlet
       filter-order: 1
-      http-response-body: '{"status": 429, "message": "Terlalu banyak permintaan. Silakan coba lagi dalam beberapa menit.", "timestamp": null, "data": null}'
+      http-response-body: '{"status": 429, "message": "Terlalu banyak permintaan.", "timestamp": null, "data": null}'
       rate-limits:
-        # ATURAN 1: Authentication (Login, Register, Logout) - Sangat Ketat
         - execute-condition: "request.getRequestURI().startsWith('/api/auth')"
           cache-key: "getRemoteAddr()"
           bandwidths:
             - capacity: 5
               time: 1
               unit: minutes
-
-        # ATURAN 2: Create, Update, Delete (CUD) - Sedang
-        # Ditambah pengecualian: HANYA JIKA BUKAN /api/auth
         - execute-condition: "request.getMethod().matches('POST|PUT|DELETE') && !request.getRequestURI().startsWith('/api/auth')"
           cache-key: "getRemoteAddr()"
           bandwidths:
             - capacity: 20
               time: 1
               unit: minutes
-
-        # ATURAN 3: Read-Only (GET) - Longgar
-        # Ditambah pengecualian: HANYA JIKA BUKAN /api/auth
         - execute-condition: "request.getMethod().equals('GET') && !request.getRequestURI().startsWith('/api/auth')"
           cache-key: "getRemoteAddr()"
           bandwidths:
