@@ -6,13 +6,12 @@ import org.springframework.stereotype.Component;
 
 import io.mpruy.gor_gemilangcondet.backend_api.dto.BaseResponseDto;
 
-import lombok.Builder;
-
-import java.util.Date;
+import java.time.Instant;
 
 /**
- * Utility to build standardized REST responses using 
- * (props to practice from) {@link io.mpruy.gor_gemilangcondet.backend_api.dto.BaseResponseDto}.
+ * Utility to build standardized REST responses using
+ * (props to practice from)
+ * {@link io.mpruy.gor_gemilangcondet.backend_api.dto.BaseResponseDto}.
  * Wrap all REST controller responses with this to keep the format consistent.
  */
 @Component
@@ -22,8 +21,8 @@ public class ResponseUtil {
      * A small wrapper around ResponseEntity that exposes a toBuilder() API
      * which preserves the original body while allowing headers/status changes.
      * This enables usage like:
-     *   return ResponseUtil.success(body, "...", HttpStatus.OK)
-     *                    .toBuilder().headers(headers).build();
+     * return ResponseUtil.success(body, "...", HttpStatus.OK)
+     * .toBuilder().headers(headers).build();
      */
     public static class WithBuilder<T> {
         private final ResponseEntity<T> entity;
@@ -59,31 +58,33 @@ public class ResponseUtil {
 
     /**
      * Build a success response with payload.
-     * @param data domain/DTO payload to return
+     * 
+     * @param data    domain/DTO payload to return
      * @param message human friendly success message
-     * @param status HTTP status to send (e.g., 200, 201)
+     * @param status  HTTP status to send (e.g., 200, 201)
      */
     public static <T> WithBuilder<BaseResponseDto<T>> success(T data, String message, HttpStatus status) {
         BaseResponseDto<T> response = new BaseResponseDto<>();
         response.setStatus(status.value());
         response.setMessage(message);
         response.setData(data);
-        response.setTimestamp(new Date());
+        response.setTimestamp(Instant.now());
         ResponseEntity<BaseResponseDto<T>> entity = new ResponseEntity<>(response, status);
         return new WithBuilder<>(entity);
     }
 
     /**
      * Build an error response without payload.
+     * 
      * @param message error details suitable for clients
-     * @param status HTTP error status (e.g., 400, 404, 409, 500)
+     * @param status  HTTP error status (e.g., 400, 404, 409, 500)
      */
     public static <T> ResponseEntity<BaseResponseDto<T>> error(String message, HttpStatus status) {
         BaseResponseDto<T> response = new BaseResponseDto<>();
         response.setStatus(status.value());
         response.setMessage(message);
         response.setData(null);
-        response.setTimestamp(new Date());
+        response.setTimestamp(Instant.now());
         return new ResponseEntity<>(response, status);
     }
 }

@@ -124,3 +124,12 @@ local.properties
 target/
 
 /bin
+
+### Upload ###
+*.log
+*.out
+*.log.*
+*.out.*
+uploads/
+/uploads/*
+!/uploads/.gitkeep

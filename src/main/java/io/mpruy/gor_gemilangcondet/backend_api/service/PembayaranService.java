@@ -3,6 +3,9 @@ package io.mpruy.gor_gemilangcondet.backend_api.service;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.responses.ConfirmPaymentResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.responses.PembayaranResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.responses.ReservasiResponse;
+import io.mpruy.gor_gemilangcondet.backend_api.exception.BadRequestException;
+import io.mpruy.gor_gemilangcondet.backend_api.exception.ConflictException;
+import io.mpruy.gor_gemilangcondet.backend_api.exception.ResourceNotFoundException;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.payment.PaymentMethod;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.payment.PaymentStatus;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.payment.PaymentType;
@@ -89,7 +92,7 @@ public class PembayaranService {
     @Transactional(readOnly = true)
     public PembayaranResponse getPaymentByReservationId(UUID reservationId) {
         Pembayaran pembayaran = pembayaranRepository.findByReservationId(reservationId)
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new ResourceNotFoundException(
                         "Pembayaran tidak ditemukan untuk reservasi: " + reservationId));
         return toPembayaranResponse(pembayaran);
     }
@@ -114,11 +117,11 @@ public class PembayaranService {
 
         // 1. Find and validate reservation
         Reservasi reservasi = reservasiRepository.findByIdWithLapangan(reservasiId)
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new ResourceNotFoundException(
                         "Reservasi tidak ditemukan: " + reservasiId));
 
         if (reservasi.getStatus() != ReservasiStatus.BELUM_DIBAYAR) {
-            throw new IllegalStateException(
+            throw new ConflictException(
                     "Bukti pembayaran hanya bisa diunggah untuk reservasi dengan status BELUM_DIBAYAR. " +
                             "Status saat ini: " + reservasi.getStatus());
         }
@@ -129,12 +132,12 @@ public class PembayaranService {
             reservasi.setStatus(ReservasiStatus.EXPIRED);
             reservasi.setUpdatedAt(now);
             reservasiRepository.save(reservasi);
-            throw new IllegalStateException("Batas waktu pembayaran telah habis. Reservasi otomatis kedaluwarsa.");
+            throw new ConflictException("Batas waktu pembayaran telah habis. Reservasi otomatis kedaluwarsa.");
         }
 
         // 3. Validate file
         if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("File bukti pembayaran wajib diunggah");
+            throw new BadRequestException("File bukti pembayaran wajib diunggah");
         }
 
         // 4. Store file
@@ -170,23 +173,23 @@ public class PembayaranService {
 
         // 1. Find and validate reservation
         Reservasi reservasi = reservasiRepository.findByIdWithLapangan(reservasiId)
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new ResourceNotFoundException(
                         "Reservasi tidak ditemukan: " + reservasiId));
 
         if (reservasi.getStatus() == ReservasiStatus.DIKONFIRMASI) {
-            throw new IllegalStateException("Reservasi sudah dikonfirmasi");
+            throw new ConflictException("Reservasi sudah dikonfirmasi");
         }
         if (reservasi.getStatus() == ReservasiStatus.DITOLAK) {
-            throw new IllegalStateException("Reservasi sudah ditolak, tidak dapat dikonfirmasi");
+            throw new ConflictException("Reservasi sudah ditolak, tidak dapat dikonfirmasi");
         }
         if (reservasi.getStatus() == ReservasiStatus.DIBATALKAN) {
-            throw new IllegalStateException("Reservasi sudah dibatalkan, tidak dapat dikonfirmasi");
+            throw new ConflictException("Reservasi sudah dibatalkan, tidak dapat dikonfirmasi");
         }
         if (reservasi.getStatus() == ReservasiStatus.EXPIRED) {
-            throw new IllegalStateException("Reservasi sudah kedaluwarsa, tidak dapat dikonfirmasi");
+            throw new ConflictException("Reservasi sudah kedaluwarsa, tidak dapat dikonfirmasi");
         }
         if (reservasi.getStatus() != ReservasiStatus.MENUNGGU_KONFIRMASI_STAF) {
-            throw new IllegalStateException(
+            throw new ConflictException(
                     "Hanya reservasi dengan status MENUNGGU_KONFIRMASI_STAF yang dapat dikonfirmasi. " +
                             "Status saat ini: " + reservasi.getStatus());
         }
@@ -249,11 +252,11 @@ public class PembayaranService {
         LocalDateTime now = LocalDateTime.now(ZONE_JAKARTA);
 
         Reservasi reservasi = reservasiRepository.findByIdWithLapangan(reservasiId)
-                .orElseThrow(() -> new IllegalArgumentException(
+                .orElseThrow(() -> new ResourceNotFoundException(
                         "Reservasi tidak ditemukan: " + reservasiId));
 
         if (reservasi.getStatus() != ReservasiStatus.MENUNGGU_KONFIRMASI_STAF) {
-            throw new IllegalStateException(
+            throw new ConflictException(
                     "Hanya reservasi dengan status MENUNGGU_KONFIRMASI_STAF yang dapat ditolak. " +
                             "Status saat ini: " + reservasi.getStatus());
         }

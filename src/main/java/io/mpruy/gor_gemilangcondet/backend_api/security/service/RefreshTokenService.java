@@ -1,5 +1,6 @@
 package io.mpruy.gor_gemilangcondet.backend_api.security.service;
 
+import io.mpruy.gor_gemilangcondet.backend_api.exception.InvalidTokenException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -20,7 +21,7 @@ public class RefreshTokenService {
     // username → refresh-token value
     private final Map<String, String> tokenByUsername = new ConcurrentHashMap<>();
 
-    // refresh-token value → username  (reverse lookup)
+    // refresh-token value → username (reverse lookup)
     private final Map<String, String> usernameByToken = new ConcurrentHashMap<>();
 
     @Value("${app.jwt.refresh-expiration:604800000}") // default 7 days
@@ -57,7 +58,7 @@ public class RefreshTokenService {
     public String validateRefreshToken(String refreshToken) {
         String username = usernameByToken.get(refreshToken);
         if (username == null) {
-            throw new IllegalArgumentException("Invalid or expired refresh token");
+            throw new InvalidTokenException("Refresh token tidak valid atau sudah kedaluwarsa");
         }
         return username;
     }
@@ -77,7 +78,8 @@ public class RefreshTokenService {
     }
 
     /**
-     * Revokes a specific refresh token directly (used when only the token is available).
+     * Revokes a specific refresh token directly (used when only the token is
+     * available).
      *
      * @param refreshToken opaque token string
      */

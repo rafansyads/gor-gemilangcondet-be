@@ -83,7 +83,8 @@ public class UserSeeder implements CommandLineRunner {
 
             Role role = roleRepository.findByRoleName(dummy.role())
                     .orElseThrow(() -> new IllegalStateException(
-                            "Role not found: " + dummy.role() + ". Ensure DataSeeder runs first."));
+                            "Peran tidak ditemukan: " + dummy.role()
+                                    + ". Pastikan DataSeeder dijalankan terlebih dahulu."));
 
             User user = User.builder()
                     .username(dummy.username())

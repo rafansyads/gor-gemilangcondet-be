@@ -28,15 +28,9 @@ public class UserController {
 
     @GetMapping
     public ResponseEntity<BaseResponseDto<List<UserDto>>> getAllUsers() {
-        try {
-            List<UserDto> users = userService.getAllUsers();
-            return ResponseUtil.success(users, "Users retrieved successfully", HttpStatus.OK)
-                    .toBuilder().build();
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Failed to retrieve users: " + ex.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        List<UserDto> users = userService.getAllUsers();
+        return ResponseUtil.success(users, "Daftar pengguna berhasil diambil", HttpStatus.OK)
+                .toBuilder().build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -45,17 +39,9 @@ public class UserController {
 
     @GetMapping("/{id}")
     public ResponseEntity<BaseResponseDto<UserDto>> getUserById(@PathVariable UUID id) {
-        try {
-            UserDto user = userService.getUserById(id);
-            return ResponseUtil.success(user, "User retrieved successfully", HttpStatus.OK)
-                    .toBuilder().build();
-        } catch (IllegalArgumentException ex) {
-            return ResponseUtil.error(ex.getMessage(), HttpStatus.NOT_FOUND);
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Failed to retrieve user: " + ex.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        UserDto user = userService.getUserById(id);
+        return ResponseUtil.success(user, "Pengguna berhasil diambil", HttpStatus.OK)
+                .toBuilder().build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -64,17 +50,27 @@ public class UserController {
 
     @GetMapping("/by-username/{username}")
     public ResponseEntity<BaseResponseDto<UserDto>> getUserByUsername(@PathVariable String username) {
-        try {
-            UserDto user = userService.getUserByUsername(username);
-            return ResponseUtil.success(user, "User retrieved successfully", HttpStatus.OK)
-                    .toBuilder().build();
-        } catch (IllegalArgumentException ex) {
-            return ResponseUtil.error(ex.getMessage(), HttpStatus.NOT_FOUND);
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Failed to retrieve user: " + ex.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        UserDto user = userService.getUserByUsername(username);
+        return ResponseUtil.success(user, "Pengguna berhasil diambil", HttpStatus.OK)
+                .toBuilder().build();
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // PUT /users/profile
+    // ──────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Update the currently authenticated user's username and email.
+     * Both must remain unique across all users.
+     *
+     * @param request wrapped {@link UpdateProfileRequest}
+     */
+    @PutMapping("/profile")
+    public ResponseEntity<BaseResponseDto<UserDto>> updateProfile(
+            @Validated @RequestBody BaseRequestDto<UpdateProfileRequest> request) {
+        UserDto updatedUser = userService.updateProfile(request.getData());
+        return ResponseUtil.success(updatedUser, "Profil berhasil diperbarui", HttpStatus.OK)
+                .toBuilder().build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
