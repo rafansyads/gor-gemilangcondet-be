@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +31,7 @@ import lombok.extern.slf4j.Slf4j;
  * are left untouched.
  */
 @Component
+@Order(1) // Run before UserSeeder (Order(2))
 @RequiredArgsConstructor
 @Slf4j
 public class DataSeeder implements ApplicationRunner {

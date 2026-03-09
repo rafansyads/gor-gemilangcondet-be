@@ -39,13 +39,9 @@ test/
 
 ## Task Owners (to be added and adapted later on)
 
-<<<<<<< HEAD
 Task Owners (to be added and adapted later on)
 
 A. Sherwyn Fawwaz Nitisara S. (2306165811) : `Penjadwalan Ulang (Reschedule)`, `Update Informasi & Tarif Lapangan`, `Tambah Produk Kantin/Toko`, `Riwayat Kartu Stok (Stock Card)`, `Laporan Kasir Harian`, `Rekapitulasi Sewa`
-=======
-- Rafansya Daryltama Santoso (2306211231): `login`, `registrasi`, `logout`, `transaksi kantin dan toko`, `manajemen membership`
->>>>>>> feat/rafansya
 
 ## Getting Started
 

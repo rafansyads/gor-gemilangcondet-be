@@ -220,11 +220,7 @@ public class PembayaranService {
         reservasi.setUpdatedAt(now);
         reservasiRepository.save(reservasi);
 
-        // 5. Mark Lapangan as DISEWAKAN
-        Lapangan lapangan = reservasi.getLapangan();
-        lapangan.setStatus(LapanganStatus.DISEWAKAN);
-        lapangan.setUpdatedAt(now);
-        lapanganRepository.save(lapangan);
+        // Court status is managed independently (e.g. DALAM_PERBAIKAN). Overlapping reservations manage time slots.
 
         log.info("Staff {} confirmed reservation {}", staffId, reservasiId);
 
@@ -234,7 +230,7 @@ public class PembayaranService {
                 .reservationStatus(ReservasiStatus.DIKONFIRMASI)
                 .paymentId(pembayaran.getId())
                 .paymentStatus(PaymentStatus.LUNAS)
-                .lapanganName(lapangan.getName())
+                .lapanganName(reservasi.getLapangan().getName())
                 .message("Pembayaran berhasil dikonfirmasi")
                 .build();
     }
@@ -268,11 +264,7 @@ public class PembayaranService {
         reservasi.setUpdatedAt(now);
         reservasiRepository.save(reservasi);
 
-        // Ensure court remains available
-        Lapangan lapangan = reservasi.getLapangan();
-        lapangan.setStatus(LapanganStatus.TERSEDIA);
-        lapangan.setUpdatedAt(now);
-        lapanganRepository.save(lapangan);
+        // Court remains available because the reservation slot is freed via DITOLAK status
 
         log.info("Staff {} rejected reservation {}", staffId, reservasiId);
 
@@ -281,7 +273,7 @@ public class PembayaranService {
                 .reservationStatus(ReservasiStatus.DITOLAK)
                 .paymentId(null)
                 .paymentStatus(null)
-                .lapanganName(lapangan.getName())
+                .lapanganName(reservasi.getLapangan().getName())
                 .message("Reservasi ditolak")
                 .build();
     }
@@ -305,13 +297,7 @@ public class PembayaranService {
             reservasi.setUpdatedAt(now);
             reservasiRepository.save(reservasi);
 
-            // Ensure court stays available
-            Lapangan lapangan = reservasi.getLapangan();
-            if (lapangan.getStatus() != LapanganStatus.TERSEDIA) {
-                lapangan.setStatus(LapanganStatus.TERSEDIA);
-                lapangan.setUpdatedAt(now);
-                lapanganRepository.save(lapangan);
-            }
+            // Court remains available because the reservation slot is freed via EXPIRED status
 
             log.info("Reservation {} expired (deadline: {})", reservasi.getId(), reservasi.getPaymentDeadline());
         }

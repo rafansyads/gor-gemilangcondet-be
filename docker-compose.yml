@@ -1,8 +1,16 @@
 services:
   gor-gemilangcondet-db:
     image: postgres:17.5-alpine
+    container_name: gor-gemilangcondet-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: gor_gemilangcondet
+      POSTGRES_USER: gor_gemilangcondet
+      POSTGRES_PASSWORD: gor_gemilangcondet
     volumes:
       - gor-gemilangcondet-db:/var/lib/postgresql/data
+    restart: unless-stopped
 
 volumes:
   gor-gemilangcondet-db:
