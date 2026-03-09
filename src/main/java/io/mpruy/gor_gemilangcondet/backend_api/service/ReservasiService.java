@@ -60,6 +60,7 @@ public class ReservasiService {
         @Transactional(readOnly = true)
         public List<LapanganResponse> getAllCourts() {
                 return lapanganRepository.findAll().stream()
+                                .sorted(Comparator.comparing(Lapangan::getName))
                                 .map(this::toLapanganResponse)
                                 .collect(Collectors.toList());
         }
@@ -67,6 +68,7 @@ public class ReservasiService {
         @Transactional(readOnly = true)
         public List<LapanganResponse> getCourtsByType(LapanganType type) {
                 return lapanganRepository.findByType(type).stream()
+                                .sorted(Comparator.comparing(Lapangan::getName))
                                 .map(this::toLapanganResponse)
                                 .collect(Collectors.toList());
         }
@@ -82,9 +84,12 @@ public class ReservasiService {
          */
         @Transactional(readOnly = true)
         public List<CourtAvailabilityResponse> getAvailability(LocalDate date, LapanganType type) {
-                List<Lapangan> courts = (type != null)
+                List<Lapangan> courts = ((type != null)
                                 ? lapanganRepository.findByType(type)
-                                : lapanganRepository.findAll();
+                                : lapanganRepository.findAll())
+                                .stream()
+                                .sorted(Comparator.comparing(Lapangan::getName))
+                                .collect(Collectors.toList());
 
                 LocalDateTime dayStart = date.atTime(OPENING_HOUR, 0);
                 LocalDateTime dayEnd = date.atTime(CLOSING_HOUR, 0);

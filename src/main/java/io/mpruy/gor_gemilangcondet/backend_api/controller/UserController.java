@@ -73,29 +73,4 @@ public class UserController {
                 .toBuilder().build();
     }
 
-    // ──────────────────────────────────────────────────────────────────────────
-    // PUT /users/profile
-    // ──────────────────────────────────────────────────────────────────────────
-
-    /**
-     * Update the currently authenticated user's username and email.
-     * Both must remain unique across all users.
-     *
-     * @param request wrapped {@link UpdateProfileRequest}
-     */
-    @PutMapping("/profile")
-    public ResponseEntity<BaseResponseDto<UserDto>> updateProfile(
-            @Validated @RequestBody BaseRequestDto<UpdateProfileRequest> request) {
-        try {
-            UserDto updatedUser = userService.updateProfile(request.getData());
-            return ResponseUtil.success(updatedUser, "Profile updated successfully", HttpStatus.OK)
-                    .toBuilder().build();
-        } catch (IllegalArgumentException ex) {
-            return ResponseUtil.error(ex.getMessage(), HttpStatus.CONFLICT);
-        } catch (Exception ex) {
-            return ResponseUtil.error(
-                    "Failed to update profile: " + ex.getMessage(),
-                    HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-    }
 }
