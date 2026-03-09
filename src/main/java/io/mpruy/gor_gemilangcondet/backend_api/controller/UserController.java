@@ -72,5 +72,4 @@ public class UserController {
         return ResponseUtil.success(updatedUser, "Profil berhasil diperbarui", HttpStatus.OK)
                 .toBuilder().build();
     }
-
 }
