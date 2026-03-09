@@ -1,5 +1,7 @@
 package io.mpruy.gor_gemilangcondet.backend_api.event;
 
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.message.ScheduleUpdateMessage;
 import io.mpruy.gor_gemilangcondet.backend_api.service.ScheduleService;
 import lombok.RequiredArgsConstructor;
@@ -28,9 +30,13 @@ public class ScheduleBroadcastListener {
 
     private final SimpMessagingTemplate messagingTemplate;
     private final ScheduleService       scheduleService;
+    private final ObjectMapper          objectMapper;
 
     /**
      * Broadcast perubahan satu slot ke topik {@code /topic/schedule/{date}}.
+     *
+     * <p>Payload dikirim sebagai JSON string (text/plain) agar kompatibel
+     * dengan berbagai STOMP client termasuk klien browser dan test client.
      *
      * <p>Diberi {@code @Async} agar tidak memblokir thread transaksi utama.
      */
@@ -40,7 +46,13 @@ public class ScheduleBroadcastListener {
         ScheduleUpdateMessage message = scheduleService.buildUpdateMessage(event.getBooking());
 
         String topic = "/topic/schedule/" + message.getDate();
-        messagingTemplate.convertAndSend(topic, message);
+        try {
+            String json = objectMapper.writeValueAsString(message);
+            messagingTemplate.convertAndSend(topic, json);
+        } catch (JacksonException e) {
+            log.error("[SCHEDULE WS] Gagal serialisasi pesan: {}", e.getMessage(), e);
+            return;
+        }
 
         log.info("[SCHEDULE WS] Broadcast → {} | court={} time={} status={}",
                 topic, message.getCourtId(), message.getTime(), message.getStatus());

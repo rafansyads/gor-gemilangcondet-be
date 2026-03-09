@@ -1,5 +1,9 @@
 package io.mpruy.gor_gemilangcondet.backend_api.service;
 
+import io.mpruy.gor_gemilangcondet.backend_api.client.ReservasiClient;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.fadhil.FadhilCourtAvailabilityDto;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.fadhil.FadhilReservasiDto;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.fadhil.FadhilSlotDto;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.message.ScheduleUpdateMessage;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.response.ScheduleResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.response.ScheduleSlotResponse;
@@ -10,6 +14,7 @@ import io.mpruy.gor_gemilangcondet.backend_api.enums.BookingStatus;
 import io.mpruy.gor_gemilangcondet.backend_api.event.BookingStatusChangedEvent;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.BookingRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.CourtRepository;
+import io.mpruy.gor_gemilangcondet.backend_api.security.JwtRoleExtractor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -52,9 +57,11 @@ public class ScheduleService {
     private static final List<BookingStatus> ACTIVE_STATUSES =
             List.of(BookingStatus.PENDING, BookingStatus.CONFIRMED);
 
-    private final CourtRepository      courtRepository;
-    private final BookingRepository    bookingRepository;
+    private final CourtRepository           courtRepository;
+    private final BookingRepository         bookingRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final ReservasiClient           reservasiClient;
+    private final JwtRoleExtractor          jwtRoleExtractor;
 
     // ──────────────────────────────────────────────────────────────────────────
     // PUBLIC API
@@ -66,6 +73,14 @@ public class ScheduleService {
      * satu baris per jam, enam kolom per lapangan.
      */
     public ScheduleResponse getSchedule(LocalDate date) {
+        return getSchedule(date, false);
+    }
+
+    /**
+     * Versi internal yang menerima flag {@code showBookerName} untuk mengontrol
+     * apakah nama pemesan ditampilkan dalam respons.
+     */
+    public ScheduleResponse getSchedule(LocalDate date, boolean showBookerName) {
 
         List<Court>   courts   = courtRepository.findAll();
         List<Booking> bookings = bookingRepository.findActiveByDate(date, ACTIVE_STATUSES);
@@ -83,7 +98,7 @@ public class ScheduleService {
                 String key    = slotKey(court.getId(), t);
                 Booking found = bookingMap.get(key);
 
-                slots.add(buildSlot(court, found));
+                slots.add(buildSlot(court, found, showBookerName));
             }
 
             timeRows.add(ScheduleTimeRowResponse.builder()
@@ -91,6 +106,99 @@ public class ScheduleService {
                     .slots(slots)
                     .build());
         }
+
+        return ScheduleResponse.builder()
+                .date(date)
+                .lastUpdated(LocalDateTime.now())
+                .timeSlots(timeRows)
+                .build();
+    }
+
+    /**
+     * Kembalikan jadwal dari backend Fadhil dengan visibility {@code namaWakil}
+     * yang bergantung pada role pemanggil.
+     *
+     * <ul>
+     *   <li>ADMIN / OWNER / STAF_LAPANGAN → {@code bookerName} berisi {@code namaWakil}</li>
+     *   <li>Role lain / anonim → {@code bookerName} null (disembunyikan)</li>
+     * </ul>
+     *
+     * @param date tanggal jadwal
+     * @param role role dari JWT (bisa null untuk pengguna anonim)
+     */
+    public ScheduleResponse getScheduleFromFadhil(LocalDate date, String role) {
+
+        boolean showBookerName = jwtRoleExtractor.canViewBookerName(role);
+
+        // 1. Ambil ketersediaan per lapangan dari Fadhil
+        List<FadhilCourtAvailabilityDto> courts = reservasiClient.getAvailability(date);
+
+        // Fallback: jika Fadhil tidak tersedia, gunakan data lokal (H2 DB)
+        if (courts == null || courts.isEmpty()) {
+            return getSchedule(date, showBookerName);
+        }
+
+        // 2. Jika admin, ambil daftar reservasi untuk lookup namaWakil
+        //    Key: "<lapanganId>_<startHour>"  →  namaWakil
+        Map<String, String> bookerMap = new HashMap<>();
+        if (showBookerName) {
+            List<FadhilReservasiDto> reservations = reservasiClient.getAllReservations();
+            for (FadhilReservasiDto r : reservations) {
+                if (r.getReservationStart() == null || r.getLapanganId() == null) continue;
+                // Iterasi setiap jam yang dicakup reservasi
+                int startHour = r.getReservationStart().getHour();
+                int endHour   = (r.getReservationEnd() != null)
+                        ? r.getReservationEnd().getHour() : startHour + 1;
+                for (int h = startHour; h < endHour; h++) {
+                    String key = r.getLapanganId().toString() + "_" + h;
+                    bookerMap.put(key, r.getNamaWakil());
+                }
+            }
+        }
+
+        // 3. Bangun grid jadwal berdasarkan data Fadhil
+        //    Susun slot per-jam, semua lapangan dalam satu baris waktu
+        //    Kumpulkan jam dari slot yang tersedia/terisi
+        Map<Integer, List<ScheduleSlotResponse>> rowMap = new HashMap<>();
+
+        for (FadhilCourtAvailabilityDto court : courts) {
+            if (court.getSlots() == null) continue;
+            for (FadhilSlotDto slot : court.getSlots()) {
+                int hour = slot.getStartHour();
+                rowMap.computeIfAbsent(hour, k -> new ArrayList<>());
+
+                String lapanganIdStr = court.getLapanganId() != null
+                        ? court.getLapanganId().toString() : null;
+
+                if (slot.isAvailable()) {
+                    rowMap.get(hour).add(ScheduleSlotResponse.builder()
+                            .lapanganId(lapanganIdStr)
+                            .courtName(court.getLapanganName())
+                            .status("AVAILABLE")
+                            .label("Book Now")
+                            .build());
+                } else {
+                    String bookerName = showBookerName
+                            ? bookerMap.get(lapanganIdStr + "_" + hour) : null;
+                    rowMap.get(hour).add(ScheduleSlotResponse.builder()
+                            .lapanganId(lapanganIdStr)
+                            .courtName(court.getLapanganName())
+                            .status("BOOKED")
+                            .label("Booked")
+                            .bookerName(bookerName)
+                            .build());
+                }
+            }
+        }
+
+        // 4. Urutkan baris berdasarkan jam
+        List<ScheduleTimeRowResponse> timeRows = rowMap.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(e -> ScheduleTimeRowResponse.builder()
+                        .time(String.format("%02d:00", e.getKey()))
+                        .slots(e.getValue())
+                        .build())
+                .toList();
 
         return ScheduleResponse.builder()
                 .date(date)
@@ -192,7 +300,7 @@ public class ScheduleService {
         return courtId + "_" + time.format(TIME_FMT);
     }
 
-    private ScheduleSlotResponse buildSlot(Court court, Booking booking) {
+    private ScheduleSlotResponse buildSlot(Court court, Booking booking, boolean showBookerName) {
         if (booking == null) {
             return ScheduleSlotResponse.builder()
                     .courtId(court.getId())
@@ -201,12 +309,13 @@ public class ScheduleService {
                     .label("Book Now")
                     .build();
         }
+        String bookerName = showBookerName ? booking.getCustomerName() : null;
         return ScheduleSlotResponse.builder()
                 .courtId(court.getId())
                 .courtName(court.getName())
                 .status("BOOKED")
-                .label(booking.getCustomerName())
-                .bookerName(booking.getCustomerName())
+                .label(showBookerName ? booking.getCustomerName() : "Booked")
+                .bookerName(bookerName)
                 .bookingId(booking.getId())
                 .build();
     }

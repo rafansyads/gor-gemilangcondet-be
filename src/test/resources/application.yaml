@@ -1,0 +1,4 @@
+# Override untuk semua test — gunakan H2 in-memory agar tidak butuh PostgreSQL
+spring:
+  profiles:
+    active: h2test

@@ -17,3 +17,6 @@ app:
   jwt:
     secret: ${JWT_SECRET:RahasiaLokalJanganDipakaiDiProduction1234567890}
     expiration: 86400000 # 24 Jam
+  fadhil:
+    # URL backend Fadhil (sesuaikan jika port berbeda)
+    base-url: ${FADHIL_BASE_URL:http://localhost:8081}

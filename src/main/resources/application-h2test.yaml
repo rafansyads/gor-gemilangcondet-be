@@ -20,3 +20,5 @@ app:
   jwt:
     secret: RahasiaLokalJanganDipakaiDiProduction1234567890
     expiration: 86400000
+  fadhil:
+    base-url: ${FADHIL_BASE_URL:http://localhost:8081}
