@@ -129,6 +129,9 @@ public class DataSeeder implements ApplicationRunner {
         }
     }
 
+    /**
+     * Development-seeding.
+     */
     private void seedLapangan() {
         if (lapanganRepository.count() > 0)
             return;
@@ -149,6 +152,9 @@ public class DataSeeder implements ApplicationRunner {
         courts.forEach(c -> log.info("Seeded lapangan: {} ({})", c.getName(), c.getType()));
     }
 
+    /**
+     * Development-seeding.
+     */
     private void seedAlatOlahraga() {
         if (alatOlahragaRepository.count() > 0)
             return;

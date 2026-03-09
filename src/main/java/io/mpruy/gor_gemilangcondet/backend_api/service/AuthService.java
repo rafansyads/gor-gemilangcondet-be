@@ -265,8 +265,8 @@ public class AuthService {
      *                                  requirements
      */
     private void validatePassword(String password) {
-        if (password == null || password.length() < 8) {
-            throw new BadRequestException("Password harus terdiri dari minimal 8 karakter.");
+        if (password == null || password.length() < 8 || password.length() > 20) {
+            throw new BadRequestException("Password harus terdiri dari minimal 8 dan maksimal 20 karakter.");
         }
         if (password.chars().noneMatch(Character::isUpperCase)) {
             throw new BadRequestException("Password harus mengandung setidaknya satu huruf kapital.");

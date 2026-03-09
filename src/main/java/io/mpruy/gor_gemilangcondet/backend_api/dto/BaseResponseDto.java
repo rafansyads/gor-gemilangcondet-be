@@ -5,7 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.Date;
+import java.time.Instant;
 
 @AllArgsConstructor
 @NoArgsConstructor
@@ -13,7 +13,7 @@ import java.util.Date;
 public class BaseResponseDto<T> {
     private int status;
     private String message;
-    @JsonFormat(shape = JsonFormat.Shape.STRING, timezone = "Asia/Jakarta")
-    private Date timestamp;
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSXXX", timezone = "Asia/Jakarta")
+    private Instant timestamp;
     private T data;
 }

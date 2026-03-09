@@ -72,6 +72,11 @@ public class GlobalExceptionHandlerController {
                 HttpStatus.CONFLICT);
     }
 
+    @ExceptionHandler(TooManyRequestException.class)
+    public ResponseEntity<BaseResponseDto<Object>> handleTooManyRequest(TooManyRequestException ex) {
+        return ResponseUtil.error("Terlalu banyak request: " + ex.getMessage(), HttpStatus.TOO_MANY_REQUESTS);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<BaseResponseDto<Object>> handleGeneral(Exception ex) {
         return ResponseUtil.error("Terjadi kesalahan tak terduga: " + ex.getMessage(),
