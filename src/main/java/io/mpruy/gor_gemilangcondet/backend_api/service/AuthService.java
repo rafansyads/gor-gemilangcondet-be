@@ -1,20 +1,7 @@
 package io.mpruy.gor_gemilangcondet.backend_api.service;
 
-import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.requests.LoginRequest;
-import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.requests.RefreshTokenRequest;
-import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.requests.RegisterRequest;
-import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.responses.AuthResponse;
-import io.mpruy.gor_gemilangcondet.backend_api.entities.users.Role;
-import io.mpruy.gor_gemilangcondet.backend_api.entities.users.RoleName;
-import io.mpruy.gor_gemilangcondet.backend_api.entities.users.User;
-import io.mpruy.gor_gemilangcondet.backend_api.repository.RoleRepository;
-import io.mpruy.gor_gemilangcondet.backend_api.repository.UserRepository;
-import io.mpruy.gor_gemilangcondet.backend_api.security.UserDetailsImpl;
-import io.mpruy.gor_gemilangcondet.backend_api.security.jwt.JwtUtils;
-import io.mpruy.gor_gemilangcondet.backend_api.security.service.JwtTokenBlacklist;
-import io.mpruy.gor_gemilangcondet.backend_api.security.service.RefreshTokenService;
-import io.mpruy.gor_gemilangcondet.backend_api.service.mapper.AuthMapper;
-import lombok.RequiredArgsConstructor;
+import java.util.Set;
+
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -25,7 +12,26 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Set;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.requests.LoginRequest;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.requests.RefreshTokenRequest;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.requests.RegisterRequest;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.responses.AuthResponse;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.responses.RegisterResponse;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.users.Role;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.users.RoleName;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.users.User;
+import io.mpruy.gor_gemilangcondet.backend_api.exception.BadRequestException;
+import io.mpruy.gor_gemilangcondet.backend_api.exception.ConflictException;
+import io.mpruy.gor_gemilangcondet.backend_api.exception.UnauthorizedException;
+import io.mpruy.gor_gemilangcondet.backend_api.repository.RoleRepository;
+import io.mpruy.gor_gemilangcondet.backend_api.repository.UserRepository;
+import io.mpruy.gor_gemilangcondet.backend_api.security.UserDetailsImpl;
+import io.mpruy.gor_gemilangcondet.backend_api.security.jwt.JwtUtils;
+import io.mpruy.gor_gemilangcondet.backend_api.security.service.JwtTokenBlacklist;
+import io.mpruy.gor_gemilangcondet.backend_api.security.service.RefreshTokenService;
+import io.mpruy.gor_gemilangcondet.backend_api.service.mapper.AuthMapper;
+import io.mpruy.gor_gemilangcondet.backend_api.service.mapper.UserMapper;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -37,17 +43,20 @@ public class AuthService {
     private final RefreshTokenService refreshTokenService;
     private final UserDetailsService userDetailsService;
     private final AuthMapper authMapper;
+    private final UserMapper userMapper;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
 
-    /** Roles that only privileged actors (admin portal) may assign during registration. */
+    /**
+     * Roles that only privileged actors (admin portal) may assign during
+     * registration.
+     */
     private static final Set<RoleName> ADMIN_ASSIGNABLE_ROLES = Set.of(
             RoleName.STAF_LAPANGAN,
             RoleName.STAF_TOKO,
             RoleName.OWNER,
-            RoleName.ADMIN
-    );
+            RoleName.ADMIN);
 
     // ──────────────────────────────────────────────────────────────────────────
     // Login
@@ -68,12 +77,34 @@ public class AuthService {
         SecurityContextHolder.getContext().setAuthentication(authentication);
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
 
-        String accessToken  = jwtUtils.generateAccessToken(userDetails);
+        String accessToken = jwtUtils.generateAccessToken(userDetails);
         String refreshToken = refreshTokenService.createRefreshToken(userDetails.getUsername());
 
         AuthResponse response = authMapper.toAuthResponse(accessToken, refreshToken, userDetails);
         response.setRedirectUrl(redirectUrl);
         return response;
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Login Admin (only allow users with admin/staff roles to log in)
+    // ──────────────────────────────────────────────────────────────────────────
+    /**
+     * Authenticates the user and issues access + refresh tokens, but only if the
+     * user has an admin/staff role.
+     *
+     * @param request     username + password
+     * @param redirectUrl optional frontend URL to echo back in the response
+     * @return {@link AuthResponse} carrying both tokens and the redirect URL
+     * @throws BadRequestException if credentials are valid but user does not have
+     *                             an admin/staff role
+     */
+    public AuthResponse loginAdmin(LoginRequest request, String redirectUrl) {
+        AuthResponse authResponse = login(request, redirectUrl);
+        String role = authResponse.getRole();
+        if (!ADMIN_ASSIGNABLE_ROLES.contains(RoleName.valueOf(role))) {
+            throw new UnauthorizedException("Pengguna tidak memiliki peran owner/admin/staff: " + role);
+        }
+        return authResponse;
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -84,17 +115,21 @@ public class AuthService {
      * Self-registration endpoint. Always assigns the {@code GUEST} role.
      *
      * @param request username + email + password
-     * @return {@link AuthResponse} with tokens for the newly created user
+     * @return {@link RegisterResponse} with the created user and a success message
      */
     @Transactional
-    public AuthResponse register(RegisterRequest request) {
+    public RegisterResponse register(RegisterRequest request) {
         assertUsernameAndEmailFree(request);
+        validatePassword(request.getPassword());
 
         Role role = requireRole(RoleName.GUEST);
         User user = buildUser(request, role);
         userRepository.save(user);
 
-        return issueTokens(user);
+        return RegisterResponse.builder()
+                .user(userMapper.toDto(user))
+                .message("Pengguna " + user.getUsername() + " berhasil dibuat")
+                .build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -103,21 +138,25 @@ public class AuthService {
 
     /**
      * Admin-portal registration. {@code request.role} must be one of the
-     * {@link #ADMIN_ASSIGNABLE_ROLES}; falls back to {@code STAF_LAPANGAN} if blank.
+     * {@link #ADMIN_ASSIGNABLE_ROLES}.
      *
      * @param request username + email + password + role name
-     * @return {@link AuthResponse} with tokens for the newly created user
+     * @return {@link RegisterResponse} with the created user and a success message
      */
     @Transactional
-    public AuthResponse registerAdmin(RegisterRequest request) {
+    public RegisterResponse registerAdmin(RegisterRequest request) {
         assertUsernameAndEmailFree(request);
+        validatePassword(request.getPassword());
 
         RoleName roleName = parseAdminRole(request.getRole());
         Role role = requireRole(roleName);
         User user = buildUser(request, role);
         userRepository.save(user);
 
-        return issueTokens(user);
+        return RegisterResponse.builder()
+                .user(userMapper.toDto(user))
+                .message("Pengguna " + user.getUsername() + " berhasil dibuat")
+                .build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -127,7 +166,8 @@ public class AuthService {
     /**
      * Blacklists the access token and revokes the refresh token.
      *
-     * @param authorizationHeader raw {@code Authorization} header value ("Bearer &lt;token&gt;")
+     * @param authorizationHeader raw {@code Authorization} header value ("Bearer
+     *                            &lt;token&gt;")
      */
     public void logout(String authorizationHeader) {
         if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
@@ -168,24 +208,25 @@ public class AuthService {
     // Helpers
     // ──────────────────────────────────────────────────────────────────────────
 
-
     /**
-     * Ensures the requested username and email are not already taken by another user.
+     * Ensures the requested username and email are not already taken by another
+     * user.
      * 
      * @param request registration request containing the desired username and email
      * @throws IllegalArgumentException if the username or email is already taken
      */
     private void assertUsernameAndEmailFree(RegisterRequest request) {
         if (userRepository.existsByUsername(request.getUsername())) {
-            throw new IllegalArgumentException("Username is already taken: " + request.getUsername());
+            throw new ConflictException("Username sudah digunakan: " + request.getUsername());
         }
         if (userRepository.existsByEmail(request.getEmail())) {
-            throw new IllegalArgumentException("Email is already registered: " + request.getEmail());
+            throw new ConflictException("Email sudah terdaftar: " + request.getEmail());
         }
     }
 
     /**
-     * Fetches the {@link Role} entity for the given {@link RoleName}, throwing an exception if not found.
+     * Fetches the {@link Role} entity for the given {@link RoleName}, throwing an
+     * exception if not found.
      * 
      * @param name the role name to look up
      * @return the corresponding Role entity
@@ -193,14 +234,16 @@ public class AuthService {
      */
     private Role requireRole(RoleName name) {
         return roleRepository.findByRoleName(name)
-                .orElseThrow(() -> new IllegalStateException("Role not found in database: " + name));
+                .orElseThrow(() -> new IllegalStateException("Peran tidak ditemukan di database: " + name));
     }
 
     /**
-     * Builds a new User entity from the registration request and assigned role, encoding the password.
+     * Builds a new User entity from the registration request and assigned role,
+     * encoding the password.
      * 
-     * @param request the registration request containing username, email, and raw password
-     * @param role the Role entity to assign to the new user
+     * @param request the registration request containing username, email, and raw
+     *                password
+     * @param role    the Role entity to assign to the new user
      * @return a new User entity ready to be saved to the database
      */
     private User buildUser(RegisterRequest request, Role role) {
@@ -213,39 +256,57 @@ public class AuthService {
     }
 
     /**
-     * Generates access and refresh tokens for the given user and constructs an AuthResponse.
-     * 
-     * @param user the User entity for whom to issue tokens
-     * @return an AuthResponse containing the issued tokens and user details
+     * Validates password strength: minimum 8 characters, at least one uppercase
+     * letter,
+     * and at least one digit.
+     *
+     * @param password the raw password to validate
+     * @throws IllegalArgumentException if the password does not meet the
+     *                                  requirements
      */
-    private AuthResponse issueTokens(User user) {
-        UserDetailsImpl userDetails = new UserDetailsImpl(user);
-        String accessToken  = jwtUtils.generateAccessToken(userDetails);
-        String refreshToken = refreshTokenService.createRefreshToken(user.getUsername());
-        return authMapper.toAuthResponse(accessToken, refreshToken, userDetails);
+    private void validatePassword(String password) {
+        if (password == null || password.length() < 8) {
+            throw new BadRequestException("Password harus terdiri dari minimal 8 karakter.");
+        }
+        if (password.chars().noneMatch(Character::isUpperCase)) {
+            throw new BadRequestException("Password harus mengandung setidaknya satu huruf kapital.");
+        }
+        if (password.chars().noneMatch(Character::isDigit)) {
+            throw new BadRequestException("Password harus mengandung setidaknya satu angka.");
+        }
+        if (password.chars().anyMatch(Character::isWhitespace)) {
+            throw new BadRequestException("Password tidak boleh mengandung karakter spasi.");
+        }
+        // Special characters are not allowed, only "_", "-", "@", and "." are permitted
+        if (password.chars().anyMatch(ch -> !Character.isLetterOrDigit(ch)
+                && ch != '_' && ch != '-' && ch != '@' && ch != '.')) {
+            throw new BadRequestException(
+                    "Password mengandung karakter tidak valid. Hanya huruf, angka, dan _ - @ . yang diperbolehkan.");
+        }
     }
 
     /**
-     * Parses and validates the requested admin role from the registration request, ensuring it is one of the allowed roles.
+     * Parses and validates the requested admin role from the registration request,
+     * ensuring it is one of the allowed roles.
      * 
      * @param rawRole the raw role name string from the registration request
      * @return the corresponding RoleName enum value if valid
-     * @throws IllegalArgumentException if the role is blank, unknown, or not allowed for admin registration
+     * @throws IllegalArgumentException if the role is blank, unknown, or not
+     *                                  allowed for admin registration
      */
     private RoleName parseAdminRole(String rawRole) {
         if (rawRole == null || rawRole.isBlank()) {
-            // Always require an explicit role for admin registration to avoid mistakes;
-            throw new IllegalArgumentException("Role is required for admin registration.");
+            throw new BadRequestException("Peran diperlukan untuk registrasi admin.");
         }
         try {
             RoleName parsed = RoleName.valueOf(rawRole.toUpperCase());
             if (!ADMIN_ASSIGNABLE_ROLES.contains(parsed)) {
-                throw new IllegalArgumentException(
-                        "Role '" + rawRole + "' cannot be assigned via admin registration.");
+                throw new BadRequestException(
+                        "Peran '" + rawRole + "' tidak dapat diberikan melalui registrasi admin.");
             }
             return parsed;
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Unknown role: " + rawRole);
+            throw new BadRequestException("Role " + rawRole + " tidak valid.");
         }
     }
 }

@@ -2,6 +2,8 @@ package io.mpruy.gor_gemilangcondet.backend_api.entities.reservations;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -52,8 +54,15 @@ public class Reservasi {
     private Lapangan lapangan;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false)
     private ReservasiStatus status;
+
+    /** Path/URL to uploaded payment proof image. */
+    private String paymentProofUrl;
+
+    /** Deadline for payment (createdAt + 10 min). Null if not applicable. */
+    private LocalDateTime paymentDeadline;
 
     @ElementCollection
     @CollectionTable(name = "reservasi_rent_list", joinColumns = @JoinColumn(name = "reservasi_id"))
