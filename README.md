@@ -1,6 +1,6 @@
 # Sistem Informasi GOR Gemilang Condet Backend API
 
-## Java Springboot Directory Structure
+Pembagian PBI Backlog: 
 
 This repository will also contains the Springboot directory in `src/main/java/io/mpruy/gor_gemilangcondet/backend_api`.  Below is the directory structure:
 
