@@ -28,10 +28,12 @@ public class CacheConfig {
                 .getCachingProvider(CaffeineCachingProvider.class.getName())
                 .getCacheManager();
 
-        cacheManager.createCache("rate-limit-buckets", new MutableConfiguration<>()
-                .setStoreByValue(false)
-                .setExpiryPolicyFactory(CreatedExpiryPolicy.factoryOf(
-                        new Duration(TimeUnit.HOURS, 1)))); // Hapus IP dari cache jika nganggur 1 jam
+        if (cacheManager.getCache("rate-limit-buckets") == null) {
+            cacheManager.createCache("rate-limit-buckets", new MutableConfiguration<>()
+                    .setStoreByValue(false)
+                    .setExpiryPolicyFactory(CreatedExpiryPolicy.factoryOf(
+                            new Duration(TimeUnit.HOURS, 1)))); // Hapus IP dari cache jika nganggur 1 jam
+        }
 
         return cacheManager;
     }
