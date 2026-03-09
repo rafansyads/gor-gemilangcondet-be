@@ -26,6 +26,8 @@ public class ReservasiResponse {
     private int jumlahOrang;
     private double totalPayment;
     private ReservasiStatus status;
+    private String paymentProofUrl;
+    private LocalDateTime paymentDeadline;
     private List<RentItemResponse> rentItems;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

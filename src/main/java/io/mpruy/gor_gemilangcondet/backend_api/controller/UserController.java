@@ -1,12 +1,15 @@
 package io.mpruy.gor_gemilangcondet.backend_api.controller;
 
+import io.mpruy.gor_gemilangcondet.backend_api.dto.BaseRequestDto;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.BaseResponseDto;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.users.UserDto;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.users.requests.UpdateProfileRequest;
 import io.mpruy.gor_gemilangcondet.backend_api.service.UserService;
 import io.mpruy.gor_gemilangcondet.backend_api.util.ResponseUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -70,6 +73,32 @@ public class UserController {
         } catch (Exception ex) {
             return ResponseUtil.error(
                     "Failed to retrieve user: " + ex.getMessage(),
+                    HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // PUT /users/profile
+    // ──────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Update the currently authenticated user's username and email.
+     * Both must remain unique across all users.
+     *
+     * @param request wrapped {@link UpdateProfileRequest}
+     */
+    @PutMapping("/profile")
+    public ResponseEntity<BaseResponseDto<UserDto>> updateProfile(
+            @Validated @RequestBody BaseRequestDto<UpdateProfileRequest> request) {
+        try {
+            UserDto updatedUser = userService.updateProfile(request.getData());
+            return ResponseUtil.success(updatedUser, "Profile updated successfully", HttpStatus.OK)
+                    .toBuilder().build();
+        } catch (IllegalArgumentException ex) {
+            return ResponseUtil.error(ex.getMessage(), HttpStatus.CONFLICT);
+        } catch (Exception ex) {
+            return ResponseUtil.error(
+                    "Failed to update profile: " + ex.getMessage(),
                     HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
