@@ -74,23 +74,8 @@ public class DataSeeder implements ApplicationRunner {
 
         LocalDateTime now = LocalDateTime.now();
         List<AlatOlahraga> equipment = List.of(
-                // Raket
-                AlatOlahraga.builder().name("Raket Badminton Yonex").type(BarangType.RAKET)
-                        .stock(10).price(15000).status(AlatOlahragaStatus.TERSEDIA)
-                        .createdAt(now).updatedAt(now).build(),
-                // Sepatu
-                AlatOlahraga.builder().name("Sepatu Badminton (40-41)").type(BarangType.SEPATU)
-                        .stock(4).price(15000).status(AlatOlahragaStatus.TERSEDIA)
-                        .createdAt(now).updatedAt(now).build(),
-                AlatOlahraga.builder().name("Sepatu Badminton (42-43)").type(BarangType.SEPATU)
-                        .stock(4).price(15000).status(AlatOlahragaStatus.TERSEDIA)
-                        .createdAt(now).updatedAt(now).build(),
-                // Aksesoris
-                AlatOlahraga.builder().name("Kok Shuttlecock (1 tabung)").type(BarangType.AKSESORIS)
-                        .stock(20).price(10000).status(AlatOlahragaStatus.TERSEDIA)
-                        .createdAt(now).updatedAt(now).build(),
-                AlatOlahraga.builder().name("Grip Raket").type(BarangType.AKSESORIS)
-                        .stock(15).price(5000).status(AlatOlahragaStatus.TERSEDIA)
+                AlatOlahraga.builder().name("Raket Badminton Premium").type(BarangType.RAKET)
+                        .stock(20).price(25000).status(AlatOlahragaStatus.TERSEDIA)
                         .createdAt(now).updatedAt(now).build()
         );
 
