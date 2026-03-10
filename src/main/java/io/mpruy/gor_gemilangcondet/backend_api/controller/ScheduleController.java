@@ -25,9 +25,9 @@ import java.time.LocalDate;
  * dapat melihat ketersediaan lapangan tanpa registrasi.
  */
 @RestController
-@RequestMapping("/api/schedule")
+@RequestMapping("/schedule")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "*") // FE development; ganti dengan origins spesifik di production
+@CrossOrigin(originPatterns = "*") // FE development; ganti dengan origins spesifik di production
 public class ScheduleController {
 
     private final ScheduleService     scheduleService;
