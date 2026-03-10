@@ -1,6 +1,7 @@
 services:
   gor-gemilangcondet-db:
-    image: postgres:17.5-alpine
+    image: postgres:16-alpine
+    container_name: gor-gemilangcondet-dev-db
     ports:
       - "35001:5432"
     restart: "no"
@@ -9,8 +10,12 @@ services:
       POSTGRES_USER: gor-gemilangcondet-dev
       POSTGRES_PASSWORD: CLI-825.2025X
     volumes:
-      - gor-gemilangcondet-db:/var/lib/postgresql/data
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gor-gemilangcondet-dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
-  gor-gemilangcondet-db:
-    driver: local
+  postgres_dev_data:
