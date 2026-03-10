@@ -2,6 +2,7 @@ package io.mpruy.gor_gemilangcondet.backend_api.uat;
 
 import io.mpruy.gor_gemilangcondet.backend_api.client.ReservasiClient;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.fadhil.FadhilCourtAvailabilityDto;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.fadhil.FadhilReservasiDto;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.fadhil.FadhilSlotDto;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.response.ScheduleResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.response.ScheduleTimeRowResponse;
@@ -22,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Collections;
 import java.util.List;
@@ -257,6 +259,110 @@ class BE1_ScheduleServiceUATTest {
         assertThat(msg.getStatus()).isEqualTo("BOOKED");
         assertThat(msg.getBookerName()).isEqualTo("Ahmad");
         assertThat(msg.getLastUpdated()).isNotNull();
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // FADHIL PATH — tests exercising getScheduleFromFadhil when Fadhil is online
+    // ──────────────────────────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("FADHIL · Guest melihat slot AVAILABLE dan BOOKED dari data Fadhil (tanpa bookerName)")
+    void fadhil_guestBuildsGridWithCorrectStatuses() {
+        UUID lapanganId = UUID.randomUUID();
+
+        FadhilSlotDto availSlot = new FadhilSlotDto();
+        availSlot.setStartHour(9);
+        availSlot.setAvailable(true);
+
+        FadhilSlotDto bookedSlot = new FadhilSlotDto();
+        bookedSlot.setStartHour(10);
+        bookedSlot.setAvailable(false);
+
+        FadhilCourtAvailabilityDto court = new FadhilCourtAvailabilityDto();
+        court.setLapanganId(lapanganId);
+        court.setLapanganName("Lapangan B");
+        court.setSlots(List.of(availSlot, bookedSlot));
+
+        when(jwtRoleExtractor.canViewBookerName(null)).thenReturn(false);
+        when(reservasiClient.getAvailability(TEST_DATE)).thenReturn(List.of(court));
+
+        ScheduleResponse response = scheduleService.getScheduleFromFadhil(TEST_DATE, null);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getDate()).isEqualTo(TEST_DATE);
+
+        long available = response.getTimeSlots().stream()
+                .flatMap(r -> r.getSlots().stream())
+                .filter(s -> "AVAILABLE".equals(s.getStatus()))
+                .count();
+        assertThat(available).isGreaterThan(0);
+
+        // Guest tidak boleh lihat bookerName
+        response.getTimeSlots().stream()
+                .flatMap(r -> r.getSlots().stream())
+                .filter(s -> "BOOKED".equals(s.getStatus()))
+                .forEach(s -> assertThat(s.getBookerName()).isNull());
+    }
+
+    @Test
+    @DisplayName("FADHIL · Admin melihat bookerName via data reservasi Fadhil")
+    void fadhil_adminSeesBookerNameFromFadhilReservations() {
+        UUID lapanganId = UUID.randomUUID();
+
+        FadhilSlotDto bookedSlot = new FadhilSlotDto();
+        bookedSlot.setStartHour(10);
+        bookedSlot.setAvailable(false);
+
+        FadhilCourtAvailabilityDto court = new FadhilCourtAvailabilityDto();
+        court.setLapanganId(lapanganId);
+        court.setLapanganName("Lapangan A");
+        court.setSlots(List.of(bookedSlot));
+
+        FadhilReservasiDto reservasi = new FadhilReservasiDto();
+        reservasi.setLapanganId(lapanganId);
+        reservasi.setNamaWakil("Budi Santoso");
+        reservasi.setReservationStart(LocalDateTime.of(2026, 3, 9, 10, 0));
+        reservasi.setReservationEnd(LocalDateTime.of(2026, 3, 9, 11, 0));
+
+        when(jwtRoleExtractor.canViewBookerName("ADMIN")).thenReturn(true);
+        when(reservasiClient.getAvailability(TEST_DATE)).thenReturn(List.of(court));
+        when(reservasiClient.getAllReservations()).thenReturn(List.of(reservasi));
+
+        ScheduleResponse response = scheduleService.getScheduleFromFadhil(TEST_DATE, "ADMIN");
+
+        var bookedSlots = response.getTimeSlots().stream()
+                .flatMap(r -> r.getSlots().stream())
+                .filter(s -> "BOOKED".equals(s.getStatus()))
+                .toList();
+
+        assertThat(bookedSlots).isNotEmpty();
+        assertThat(bookedSlots.get(0).getBookerName()).isEqualTo("Budi Santoso");
+    }
+
+    @Test
+    @DisplayName("FADHIL · Lapangan dengan slot null dilewati tanpa error; lapangan lain tetap tampil")
+    void fadhil_courtWithNullSlotsIsSkippedGracefully() {
+        FadhilCourtAvailabilityDto courtNull = new FadhilCourtAvailabilityDto();
+        courtNull.setLapanganId(UUID.randomUUID());
+        courtNull.setLapanganName("Lapangan C");
+        courtNull.setSlots(null); // edge case: slot null
+
+        FadhilSlotDto slot = new FadhilSlotDto();
+        slot.setStartHour(8);
+        slot.setAvailable(true);
+
+        FadhilCourtAvailabilityDto courtValid = new FadhilCourtAvailabilityDto();
+        courtValid.setLapanganId(UUID.randomUUID());
+        courtValid.setLapanganName("Lapangan D");
+        courtValid.setSlots(List.of(slot));
+
+        when(jwtRoleExtractor.canViewBookerName(null)).thenReturn(false);
+        when(reservasiClient.getAvailability(TEST_DATE)).thenReturn(List.of(courtNull, courtValid));
+
+        ScheduleResponse response = scheduleService.getScheduleFromFadhil(TEST_DATE, null);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getTimeSlots()).isNotEmpty();
     }
 
     /* Helper: build FadhilSlotDto */

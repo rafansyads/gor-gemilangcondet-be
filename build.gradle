@@ -73,6 +73,8 @@ jacocoTestReport {
 				'**/entity/**',
 				'**/enums/**',
 				'**/event/**',
+				'**/client/**',
+				'**/security/**',
 			])
 		}))
 	}

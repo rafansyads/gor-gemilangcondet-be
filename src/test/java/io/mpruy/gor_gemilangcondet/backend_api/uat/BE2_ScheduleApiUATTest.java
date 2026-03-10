@@ -215,6 +215,34 @@ class BE2_ScheduleApiUATTest {
     }
 
     @Test
+    @DisplayName("TestBookingController · DELETE /api/test/book/{id} membatalkan booking")
+    void testController_cancelBookingReturnsOk() throws Exception {
+        // Buat booking terlebih dahulu
+        String body = objectMapper.writeValueAsString(Map.of(
+                "courtId", 5, "date", DATE, "time", "17:00", "customerName", "Tari"
+        ));
+        MvcResult createResult = mockMvc.perform(post("/api/test/book")
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated())
+                .andReturn();
+
+        String bookingId = objectMapper.readTree(createResult.getResponse().getContentAsString())
+                .get("id").asText();
+
+        // DELETE — batalkan booking
+        mockMvc.perform(delete("/api/test/book/" + bookingId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").exists());
+    }
+
+    @Test
+    @DisplayName("TestBookingController · DELETE dengan ID tidak ada mengembalikan 404")
+    void testController_cancelNonExistentBookingReturns404() throws Exception {
+        mockMvc.perform(delete("/api/test/book/" + java.util.UUID.randomUUID()))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     @DisplayName("Tidak ada Authorization header — semua bookerName null (guest mode)")
     void noAuth_allBookerNamesAreNull() throws Exception {
         // Buat booking dulu
