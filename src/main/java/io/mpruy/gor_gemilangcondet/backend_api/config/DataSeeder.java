@@ -44,6 +44,7 @@ public class DataSeeder implements ApplicationRunner {
         seedRoles();
         seedLapangan(); // nantinya tergantung GOR
         seedAlatOlahraga(); // nantinya tergantung GOR, bisa jadi tidak ada alat olahraga yang disewakan
+        resetAllLapanganToTersedia();
     }
 
     /**
@@ -153,6 +154,24 @@ public class DataSeeder implements ApplicationRunner {
     }
 
     /**
+     * Reset semua lapangan yang tidak TERSEDIA kembali ke TERSEDIA saat startup.
+     * Berguna di development agar semua lapangan selalu bisa dipesan ulang.
+     */
+    private void resetAllLapanganToTersedia() {
+        LocalDateTime now = LocalDateTime.now();
+        lapanganRepository.findAll().forEach(lapangan -> {
+            if (lapangan.getStatus() != LapanganStatus.TERSEDIA) {
+                lapangan.setStatus(LapanganStatus.TERSEDIA);
+                lapangan.setMaintenanceStart(null);
+                lapangan.setMaintenanceEnd(null);
+                lapangan.setUpdatedAt(now);
+                lapanganRepository.save(lapangan);
+                log.info("Reset lapangan ke TERSEDIA: {} ({})", lapangan.getName(), lapangan.getType());
+            }
+        });
+    }
+
+    /**
      * Development-seeding.
      */
     private void seedAlatOlahraga() {
@@ -161,21 +180,10 @@ public class DataSeeder implements ApplicationRunner {
 
         LocalDateTime now = LocalDateTime.now();
         List<AlatOlahraga> equipment = List.of(
-                AlatOlahraga.builder().name("Raket Badminton Yonex").type(BarangType.RAKET)
-                        .stock(10).price(15000).status(AlatOlahragaStatus.TERSEDIA)
-                        .createdAt(now).updatedAt(now).build(),
-                AlatOlahraga.builder().name("Sepatu Badminton (40-41)").type(BarangType.SEPATU)
-                        .stock(4).price(15000).status(AlatOlahragaStatus.TERSEDIA)
-                        .createdAt(now).updatedAt(now).build(),
-                AlatOlahraga.builder().name("Sepatu Badminton (42-43)").type(BarangType.SEPATU)
-                        .stock(4).price(15000).status(AlatOlahragaStatus.TERSEDIA)
-                        .createdAt(now).updatedAt(now).build(),
-                AlatOlahraga.builder().name("Kok Shuttlecock (1 tabung)").type(BarangType.AKSESORIS)
-                        .stock(20).price(10000).status(AlatOlahragaStatus.TERSEDIA)
-                        .createdAt(now).updatedAt(now).build(),
-                AlatOlahraga.builder().name("Grip Raket").type(BarangType.AKSESORIS)
-                        .stock(15).price(5000).status(AlatOlahragaStatus.TERSEDIA)
-                        .createdAt(now).updatedAt(now).build());
+                AlatOlahraga.builder().name("Raket Badminton Premium").type(BarangType.RAKET)
+                        .stock(20).price(25000).status(AlatOlahragaStatus.TERSEDIA)
+                        .createdAt(now).updatedAt(now).build()
+        );
 
         alatOlahragaRepository.saveAll(equipment);
         equipment.forEach(e -> log.info("Seeded alat olahraga: {} ({}) - stok: {}",

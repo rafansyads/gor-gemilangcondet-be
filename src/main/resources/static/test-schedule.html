@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Test — Jadwal Real-Time GOR Gemilang Condet</title>
+
+  <!-- STOMP.js + SockJS -->
+  <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@6/bundles/stomp.umd.min.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f5f5f5;
+      color: #333;
+      min-height: 100vh;
+    }
+
+    /* ── NAV ── */
+    nav {
+      background: #fff;
+      border-bottom: 1px solid #eee;
+      padding: 0 32px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+    .nav-brand { display: flex; align-items: center; gap: 10px; }
+    .nav-logo {
+      width: 34px; height: 34px; border-radius: 50%;
+      background: #e53935; color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 13px;
+    }
+    .nav-brand-text { font-weight: 700; font-size: 15px; letter-spacing: .3px; }
+    .nav-links { display: flex; gap: 28px; }
+    .nav-links a {
+      text-decoration: none; color: #666; font-size: 14px;
+      padding: 4px 0; border-bottom: 2px solid transparent;
+    }
+    .nav-links a.active { color: #e53935; border-bottom-color: #e53935; font-weight: 600; }
+    .nav-avatar {
+      width: 34px; height: 34px; border-radius: 50%;
+      background: #1a237e; color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700;
+    }
+
+    /* ── PAGE ── */
+    main { max-width: 1100px; margin: 0 auto; padding: 28px 20px 60px; }
+
+    .page-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      margin-bottom: 24px;
+    }
+    .page-title { font-size: 16px; font-weight: 700; letter-spacing: .4px; }
+    .page-subtitle { font-size: 13px; color: #888; margin-top: 4px; }
+    .header-actions { display: flex; gap: 10px; }
+
+    button {
+      cursor: pointer; border: none; border-radius: 8px;
+      font-size: 13px; font-weight: 600; padding: 8px 16px;
+      transition: opacity .15s;
+    }
+    button:hover { opacity: .85; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+
+    .btn-ghost {
+      background: #fff; border: 1px solid #ddd; color: #555;
+    }
+    .btn-primary { background: #e53935; color: #fff; }
+
+    /* ── WS STATUS ── */
+    .ws-status {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; padding: 5px 12px; border-radius: 20px;
+      background: #fff; border: 1px solid #eee;
+    }
+    .ws-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .ws-dot.connected    { background: #43a047; animation: pulse 2s infinite; }
+    .ws-dot.connecting   { background: #fb8c00; animation: pulse .8s infinite; }
+    .ws-dot.disconnected { background: #e53935; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; } 50% { opacity: .4; }
+    }
+
+    /* ── CARD ── */
+    .card {
+      background: #fff; border-radius: 12px;
+      box-shadow: 0 1px 6px rgba(0,0,0,.08); overflow: hidden;
+    }
+
+    /* ── DATE BAR ── */
+    .date-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 20px; border-bottom: 1px solid #f0f0f0;
+    }
+    .date-nav { display: flex; align-items: center; gap: 10px; }
+    .date-nav button {
+      width: 30px; height: 30px; padding: 0; border-radius: 50%;
+      background: #f5f5f5; border: 1px solid #e0e0e0; color: #555;
+      font-size: 16px; display: flex; align-items: center; justify-content: center;
+    }
+    .date-label { font-size: 14px; font-weight: 600; min-width: 160px; text-align: center; }
+    .legend { display: flex; align-items: center; gap: 16px; font-size: 12px; color: #666; }
+    .legend-dot {
+      display: inline-block; width: 10px; height: 10px;
+      border-radius: 2px; margin-right: 5px;
+    }
+    .legend-dot.available { background: #c8e6c9; border: 1px solid #81c784; }
+    .legend-dot.booked    { background: #ffcdd2; border: 1px solid #e57373; }
+
+    /* ── HINT BANNER ── */
+    .hint-banner {
+      margin: 12px 16px 0;
+      background: #e3f2fd; border-radius: 8px;
+      padding: 9px 14px; font-size: 13px; color: #1565c0;
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    /* ── GRID ── */
+    .grid-wrap { overflow-x: auto; padding: 12px 0 4px; }
+    table {
+      width: 100%; border-collapse: collapse;
+      min-width: 700px;
+    }
+    thead th {
+      padding: 8px 12px; font-size: 12px; font-weight: 600;
+      color: #888; text-align: center; white-space: nowrap;
+    }
+    thead th:first-child { text-align: left; width: 70px; }
+    tbody tr:hover td { background: #fafafa; }
+    tbody td {
+      padding: 6px 8px; text-align: center;
+      border-top: 1px solid #f5f5f5;
+    }
+    tbody td:first-child {
+      text-align: left; padding-left: 16px;
+      font-size: 13px; font-weight: 600; color: #555;
+      width: 70px;
+    }
+
+    /* ── SLOT BUTTON ── */
+    .slot {
+      width: 100%; padding: 7px 4px; border-radius: 6px;
+      font-size: 12px; font-weight: 600;
+      transition: transform .1s, box-shadow .1s;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .slot:active { transform: scale(.97); }
+    .slot.available {
+      background: #e8f5e9; color: #2e7d32;
+      border: 1px solid #a5d6a7;
+    }
+    .slot.booked {
+      background: #ffebee; color: #c62828;
+      border: 1px solid #ef9a9a;
+      cursor: not-allowed;
+      opacity: .85;
+    }
+    .slot.loading {
+      background: #f5f5f5; color: #aaa;
+      border: 1px solid #e0e0e0;
+      cursor: wait;
+    }
+
+    /* ── TOAST ── */
+    #toast-area {
+      position: fixed; bottom: 24px; right: 24px;
+      display: flex; flex-direction: column-reverse; gap: 8px;
+      z-index: 9999;
+    }
+    .toast {
+      min-width: 260px; max-width: 340px;
+      padding: 12px 16px; border-radius: 10px;
+      font-size: 13px; font-weight: 500;
+      box-shadow: 0 4px 16px rgba(0,0,0,.14);
+      animation: slideIn .25s ease;
+    }
+    .toast.success { background: #2e7d32; color: #fff; }
+    .toast.error   { background: #c62828; color: #fff; }
+    .toast.info    { background: #1565c0; color: #fff; }
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to   { transform: translateX(0);    opacity: 1; }
+    }
+
+    /* ── MODAL ── */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,.45);
+      display: none; align-items: center; justify-content: center; z-index: 500;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: #fff; border-radius: 14px; padding: 28px;
+      width: 360px; box-shadow: 0 8px 32px rgba(0,0,0,.18);
+      animation: modalIn .2s ease;
+    }
+    @keyframes modalIn {
+      from { transform: scale(.9); opacity: 0; }
+      to   { transform: scale(1);  opacity: 1; }
+    }
+    .modal h3 { font-size: 16px; margin-bottom: 4px; }
+    .modal .modal-sub { font-size: 13px; color: #888; margin-bottom: 20px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 12px; font-weight: 600; color: #555; margin-bottom: 6px; }
+    .form-group input {
+      width: 100%; padding: 9px 12px; border: 1px solid #ddd;
+      border-radius: 8px; font-size: 14px;
+      outline: none; transition: border-color .2s;
+    }
+    .form-group input:focus { border-color: #e53935; }
+    .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+    .modal-actions button { flex: 1; padding: 10px; }
+
+    /* ── LOG PANEL ── */
+    .log-panel {
+      margin-top: 24px; background: #1a1a2e; border-radius: 12px;
+      padding: 16px 20px;
+    }
+    .log-panel h4 { color: #90caf9; font-size: 13px; margin-bottom: 12px; }
+    .log-list {
+      max-height: 200px; overflow-y: auto;
+      display: flex; flex-direction: column-reverse; gap: 4px;
+    }
+    .log-item {
+      font-size: 12px; font-family: monospace;
+      padding: 5px 8px; border-radius: 4px;
+      display: flex; gap: 10px; align-items: baseline;
+    }
+    .log-item.ws-msg     { background: rgba(144,202,249,.1); color: #90caf9; }
+    .log-item.api-ok     { background: rgba(165,214,167,.1); color: #a5d6a7; }
+    .log-item.api-err    { background: rgba(239,154,154,.1); color: #ef9a9a; }
+    .log-item.info       { background: rgba(255,255,255,.04); color: #aaa; }
+    .log-time { color: #666; flex-shrink: 0; }
+
+    /* ── LOADING OVERLAY ── */
+    .grid-loading {
+      text-align: center; padding: 60px 20px;
+      font-size: 14px; color: #aaa;
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-brand">
+    <div class="nav-logo">AI</div>
+    <div class="nav-brand-text">ANUGRAH ILAHI</div>
+  </div>
+  <div class="nav-links">
+    <a href="#">Home</a>
+    <a href="#">Book Court</a>
+    <a href="#" class="active">Schedule</a>
+    <a href="#">My Bookings</a>
+  </div>
+  <div class="nav-avatar">JD</div>
+</nav>
+
+<!-- MAIN -->
+<main>
+  <div class="page-header">
+    <div>
+      <div class="page-title">JADWAL LAPANGAN REAL-TIME</div>
+      <div class="page-subtitle" id="last-updated">Live availability • Menghubungkan…</div>
+    </div>
+    <div class="header-actions">
+      <div class="ws-status">
+        <div class="ws-dot connecting" id="ws-dot"></div>
+        <span id="ws-label">Connecting…</span>
+      </div>
+      <button class="btn-ghost" onclick="refreshSchedule()">⟳ Refresh</button>
+    </div>
+  </div>
+
+  <!-- SCHEDULE CARD -->
+  <div class="card">
+    <div class="date-bar">
+      <div class="date-nav">
+        <button onclick="changeDate(-1)">‹</button>
+        <div class="date-label" id="date-label">—</div>
+        <button onclick="changeDate(+1)">›</button>
+      </div>
+      <div class="legend">
+        <span><span class="legend-dot available"></span>Available</span>
+        <span><span class="legend-dot booked"></span>Booked</span>
+      </div>
+    </div>
+
+    <div class="hint-banner">
+      ↕ Klik slot <strong>Available</strong> untuk booking. Slot <strong>Booked</strong> tidak dapat ditekan.
+      Update langsung via WebSocket tanpa refresh halaman.
+    </div>
+
+    <div class="grid-wrap">
+      <div id="grid-container" class="grid-loading">Memuat jadwal…</div>
+    </div>
+  </div>
+
+  <!-- LOG PANEL -->
+  <div class="log-panel">
+    <h4>📡 Log Real-Time (WebSocket + API)</h4>
+    <div class="log-list" id="log-list"></div>
+  </div>
+</main>
+
+<!-- BOOKING MODAL -->
+<div class="modal-backdrop" id="booking-modal">
+  <div class="modal">
+    <h3>Pesan Lapangan</h3>
+    <div class="modal-sub" id="modal-slot-info">—</div>
+    <div class="form-group">
+      <label>Nama Pemesan</label>
+      <input type="text" id="customer-name" placeholder="Contoh: Budi Santoso" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal()">Batal</button>
+      <button class="btn-primary" onclick="confirmBooking()">Konfirmasi</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST AREA -->
+<div id="toast-area"></div>
+
+<script>
+  // ── CONFIG ──────────────────────────────────────────────────────────────────
+  const API_BASE = 'http://localhost:8080';
+  const COURTS   = [1, 2, 3, 4, 5, 6];
+  const TIMES    = ['07:00','08:00','09:00','10:00','11:00','12:00','13:00',
+                    '14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00','22:00'];
+
+  // ── STATE ───────────────────────────────────────────────────────────────────
+  let currentDate  = new Date();
+  let scheduleData = {};   // key: "courtId_HH:MM" → {status, label, bookingId}
+  let stompClient  = null;
+  let wsSubscription = null;
+
+  // pending booking action
+  let pendingSlot = null;  // {courtId, time}
+
+  // ── UTILITIES ───────────────────────────────────────────────────────────────
+  function fmtDate(d) {
+    return d.toISOString().split('T')[0]; // yyyy-MM-dd
+  }
+  function fmtDateDisplay(d) {
+    return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+  function slotKey(courtId, time) {
+    return `${courtId}_${time}`;
+  }
+  function nowTime() {
+    return new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+
+  // ── LOG ─────────────────────────────────────────────────────────────────────
+  function log(msg, type = 'info') {
+    const list = document.getElementById('log-list');
+    const el = document.createElement('div');
+    el.className = `log-item ${type}`;
+    el.innerHTML = `<span class="log-time">${nowTime()}</span><span>${msg}</span>`;
+    list.prepend(el);
+    // keep last 100
+    while (list.children.length > 100) list.removeChild(list.lastChild);
+  }
+
+  // ── TOAST ───────────────────────────────────────────────────────────────────
+  function toast(msg, type = 'info') {
+    const area = document.getElementById('toast-area');
+    const t = document.createElement('div');
+    t.className = `toast ${type}`;
+    t.textContent = msg;
+    area.appendChild(t);
+    setTimeout(() => t.remove(), 3500);
+  }
+
+  // ── WebSocket ────────────────────────────────────────────────────────────────
+  function connectWS() {
+    setWsStatus('connecting');
+    stompClient = new StompJs.Client({
+      webSocketFactory: () => new SockJS(`${API_BASE}/ws`),
+      reconnectDelay: 5000,
+      onConnect: () => {
+        setWsStatus('connected');
+        log('WebSocket terhubung ke server', 'info');
+        subscribeToDate(fmtDate(currentDate));
+      },
+      onDisconnect: () => {
+        setWsStatus('disconnected');
+        log('WebSocket terputus', 'api-err');
+      },
+      onStompError: (frame) => {
+        setWsStatus('disconnected');
+        log('STOMP error: ' + frame.headers?.message, 'api-err');
+      }
+    });
+    stompClient.activate();
+  }
+
+  function subscribeToDate(dateStr) {
+    if (wsSubscription) {
+      wsSubscription.unsubscribe();
+      wsSubscription = null;
+    }
+    if (!stompClient?.connected) return;
+
+    const topic = `/topic/schedule/${dateStr}`;
+    wsSubscription = stompClient.subscribe(topic, (msg) => {
+      const update = JSON.parse(msg.body);
+      log(`📨 WS update: Court ${update.courtId} | ${update.time} → ${update.status}${update.bookerName ? ' (' + update.bookerName + ')' : ''}`, 'ws-msg');
+      applyWsUpdate(update);
+    });
+    log(`Subscribing ke ${topic}`, 'info');
+  }
+
+  function setWsStatus(status) {
+    const dot   = document.getElementById('ws-dot');
+    const label = document.getElementById('ws-label');
+    dot.className = `ws-dot ${status}`;
+    label.textContent = status === 'connected'    ? 'Connected'
+                      : status === 'connecting'   ? 'Connecting…'
+                      : 'Disconnected';
+  }
+
+  // Apply single slot update from WebSocket WITHOUT full page reload
+  function applyWsUpdate(update) {
+    const key  = slotKey(update.courtId, update.time);
+    const isBooked = update.status === 'BOOKED';
+
+    // update in-memory state
+    if (scheduleData[key]) {
+      scheduleData[key].status    = isBooked ? 'BOOKED' : 'AVAILABLE';
+      scheduleData[key].label     = update.label || (isBooked ? update.bookerName : 'Book Now');
+      scheduleData[key].bookerName = update.bookerName || null;
+    }
+
+    // update DOM cell directly
+    const btn = document.getElementById(`slot-${key}`);
+    if (!btn) return;
+    if (isBooked) {
+      btn.className  = 'slot booked';
+      btn.textContent = 'Booked';
+      btn.title       = 'Slot ini sudah dipesan';
+      btn.disabled    = true;
+    } else {
+      btn.className  = 'slot available';
+      btn.textContent = 'Available';
+      btn.title       = 'Klik untuk memesan';
+      btn.disabled    = false;
+    }
+
+    // flash highlight
+    btn.style.outline = '2px solid #fb8c00';
+    setTimeout(() => { btn.style.outline = ''; }, 1200);
+
+    // update last-updated
+    document.getElementById('last-updated').textContent =
+      `Live availability • Updated ${nowTime()}`;
+  }
+
+  // ── SCHEDULE API ─────────────────────────────────────────────────────────────
+  async function fetchSchedule(dateStr) {
+    const container = document.getElementById('grid-container');
+    container.innerHTML = '<div class="grid-loading">Memuat jadwal…</div>';
+    scheduleData = {};
+
+    try {
+      const res  = await fetch(`${API_BASE}/api/schedule?date=${dateStr}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      log(`Jadwal dimuat untuk ${dateStr} (${data.timeSlots?.length || 0} baris)`, 'api-ok');
+      renderGrid(data);
+      document.getElementById('last-updated').textContent =
+        `Live availability • Updated ${nowTime()}`;
+    } catch (err) {
+      container.innerHTML = `<div class="grid-loading" style="color:#e53935">
+        Gagal memuat jadwal: ${err.message}<br><br>
+        Pastikan backend berjalan di ${API_BASE}
+      </div>`;
+      log(`Gagal fetch jadwal: ${err.message}`, 'api-err');
+    }
+  }
+
+  function renderGrid(data) {
+    const container = document.getElementById('grid-container');
+
+    // Build lookup from API response
+    for (const row of (data.timeSlots || [])) {
+      for (const slot of (row.slots || [])) {
+        const key = slotKey(slot.courtId, row.time);
+        scheduleData[key] = {
+          status:     slot.status,
+          label:      slot.label,
+          bookerName: slot.bookerName || null,
+          bookingId:  slot.bookingId || null,
+        };
+      }
+    }
+
+    // Render table
+    let html = `<table>
+      <thead>
+        <tr>
+          <th>Time</th>
+          ${COURTS.map(c => `<th>Court ${c}</th>`).join('')}
+        </tr>
+      </thead>
+      <tbody>`;
+
+    for (const time of TIMES) {
+      html += `<tr><td>${time}</td>`;
+      for (const courtId of COURTS) {
+        const key  = slotKey(courtId, time);
+        const s    = scheduleData[key] || { status: 'AVAILABLE', label: 'Available' };
+        const isBooked = s.status === 'BOOKED';
+        const btnClass = isBooked ? 'booked' : 'available';
+        const btnText  = isBooked ? 'Booked' : 'Available';
+        const title    = isBooked ? 'Slot ini sudah dipesan' : 'Klik untuk memesan';
+        const disabled = isBooked ? 'disabled' : '';
+        html += `<td>
+          <button id="slot-${key}"
+            class="slot ${btnClass}"
+            title="${title}"
+            ${disabled}
+            onclick="onSlotClick(${courtId}, '${time}', '${key}')">  
+            ${btnText}
+          </button>
+        </td>`;
+      }
+      html += `</tr>`;
+    }
+
+    html += `</tbody></table>`;
+    container.innerHTML = html;
+  }
+
+  // ── SLOT INTERACTION ─────────────────────────────────────────────────────────
+  function onSlotClick(courtId, time, key) {
+    const s = scheduleData[key];
+    if (!s || s.status !== 'AVAILABLE') return;
+    openModal(courtId, time);
+  }
+
+  // ── BOOKING MODAL ────────────────────────────────────────────────────────────
+  function openModal(courtId, time) {
+    pendingSlot = { courtId, time };
+    document.getElementById('modal-slot-info').textContent =
+      `Court ${courtId} • ${time} • ${fmtDateDisplay(currentDate)}`;
+    document.getElementById('customer-name').value = '';
+    document.getElementById('booking-modal').classList.add('open');
+    setTimeout(() => document.getElementById('customer-name').focus(), 100);
+  }
+  function closeModal() {
+    document.getElementById('booking-modal').classList.remove('open');
+    pendingSlot = null;
+  }
+
+  async function confirmBooking() {
+    if (!pendingSlot) return;
+    const name = document.getElementById('customer-name').value.trim();
+    if (!name) {
+      toast('Isi nama pemesan dulu ya!', 'error');
+      return;
+    }
+
+    const { courtId, time } = pendingSlot;
+    closeModal();
+    setSlotLoading(slotKey(courtId, time));
+    log(`Membuat booking: Court ${courtId} | ${time} | ${name}`, 'info');
+
+    try {
+      const res = await fetch(`${API_BASE}/api/test/book`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          courtId,
+          date: fmtDate(currentDate),
+          time,
+          customerName: name,
+        })
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+
+      log(`✅ Booking OK — ID: ${body.id} | ${name} @ Court ${courtId} ${time}`, 'api-ok');
+      toast(`Booking berhasil! WebSocket akan update grid sekarang.`, 'success');
+      // WebSocket broadcast akan update sel secara otomatis
+    } catch (err) {
+      log(`❌ Booking gagal: ${err.message}`, 'api-err');
+      toast(`Gagal: ${err.message}`, 'error');
+      refreshSchedule(); // fallback reload
+    }
+  }
+
+  // ── CANCEL ───────────────────────────────────────────────────────────────────
+  async function cancelBooking(courtId, time, key) {
+    const s = scheduleData[key];
+    if (!s?.bookingId) {
+      toast('Booking ID tidak ditemukan, refresh jadwal dulu.', 'error');
+      refreshSchedule();
+      return;
+    }
+
+    setSlotLoading(key);
+    log(`Membatalkan booking ID: ${s.bookingId} | Court ${courtId} ${time}`, 'info');
+
+    try {
+      const res  = await fetch(`${API_BASE}/api/test/book/${s.bookingId}`, { method: 'DELETE' });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+
+      log(`✅ Booking dibatalkan — ID: ${s.bookingId}`, 'api-ok');
+      toast(`Booking dibatalkan! WebSocket akan update grid sekarang.`, 'success');
+      // WebSocket broadcast akan update sel secara otomatis
+    } catch (err) {
+      log(`❌ Cancel gagal: ${err.message}`, 'api-err');
+      toast(`Gagal: ${err.message}`, 'error');
+      refreshSchedule(); // fallback reload
+    }
+  }
+
+  function setSlotLoading(key) {
+    const btn = document.getElementById(`slot-${key}`);
+    if (btn) {
+      btn.className  = 'slot loading';
+      btn.textContent = '…';
+      btn.disabled   = true;
+    }
+  }
+
+  // ── DATE NAVIGATION ───────────────────────────────────────────────────────────
+  function changeDate(delta) {
+    currentDate = new Date(currentDate);
+    currentDate.setDate(currentDate.getDate() + delta);
+    applyDate();
+  }
+  function applyDate() {
+    const dateStr = fmtDate(currentDate);
+    document.getElementById('date-label').textContent = fmtDateDisplay(currentDate);
+    fetchSchedule(dateStr);
+    subscribeToDate(dateStr);
+  }
+  function refreshSchedule() {
+    fetchSchedule(fmtDate(currentDate));
+  }
+
+  // ── INIT ──────────────────────────────────────────────────────────────────────
+  window.addEventListener('load', () => {
+    document.getElementById('date-label').textContent = fmtDateDisplay(currentDate);
+    connectWS();
+    fetchSchedule(fmtDate(currentDate));
+    log(`Test interface dimuat. Backend: ${API_BASE}`, 'info');
+  });
+
+  // Close modal on backdrop click
+  document.getElementById('booking-modal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeModal();
+  });
+
+  // Enter to confirm booking
+  document.getElementById('customer-name').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') confirmBooking();
+  });
+</script>
+</body>
+</html>

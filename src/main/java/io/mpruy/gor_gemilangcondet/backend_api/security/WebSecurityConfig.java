@@ -11,6 +11,7 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
@@ -45,12 +46,22 @@ public class WebSecurityConfig {
                 .securityMatcher("/**")
                 .cors(Customizer.withDefaults())
                 .csrf(csrf -> csrf.disable())
+                .headers(h -> h.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin))
                 .authorizeHttpRequests(requests -> requests
                         // Always allow preflight requests
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
                         // Auth controller: allow all (login and register are public)
                         .requestMatchers("/auth/**").permitAll()
+
+                        // Schedule & WebSocket — publik
+                        .requestMatchers("/api/schedule/**").permitAll()
+                        .requestMatchers("/api/test/**").permitAll()
+                        .requestMatchers("/ws/**").permitAll()
+
+                        // Static files & H2 console (dev)
+                        .requestMatchers("/", "/test-schedule.html", "/*.html", "/**.html").permitAll()
+                        .requestMatchers("/h2-console/**").permitAll()
 
                         // TODO: narrow down once RBAC is defined per endpoint
                         .requestMatchers("/**").permitAll() // temporary, to be replaced with actual RBAC rules

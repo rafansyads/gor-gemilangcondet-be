@@ -1,0 +1,357 @@
+{
+  "info": {
+    "name": "GOR Gemilang Condet — Jadwal Real-Time",
+    "description": "Collection untuk menguji sistem penjadwalan real-time GOR Gemilang Condet.\n\nPastikan backend berjalan di http://localhost:8080 dengan profil h2test.\n\nUrutan test yang disarankan:\n1. GET Schedule (lihat jadwal kosong)\n2. POST Book Court (booking sebuah slot)\n3. GET Schedule lagi (verifikasi slot berubah)\n4. DELETE Cancel Booking (batalkan)\n5. GET Schedule lagi (verifikasi slot kembali available)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "today",
+      "value": "2026-03-04",
+      "type": "string"
+    },
+    {
+      "key": "bookingId",
+      "value": "",
+      "type": "string",
+      "description": "Otomatis terisi saat POST Book Court dijalankan"
+    }
+  ],
+  "item": [
+    {
+      "name": "📅 Schedule",
+      "item": [
+        {
+          "name": "GET Schedule — Hari Ini",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response punya timeSlots', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('date');",
+                  "    pm.expect(json).to.have.property('timeSlots');",
+                  "    pm.expect(json.timeSlots).to.be.an('array').and.have.lengthOf(16);",
+                  "});",
+                  "pm.test('Setiap baris punya 6 slot', () => {",
+                  "    const json = pm.response.json();",
+                  "    json.timeSlots.forEach(row => {",
+                  "        pm.expect(row.slots).to.have.lengthOf(6);",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/schedule?date={{today}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "schedule"],
+              "query": [
+                {
+                  "key": "date",
+                  "value": "{{today}}",
+                  "description": "Format: yyyy-MM-dd. Kosongkan untuk default hari ini."
+                }
+              ]
+            },
+            "description": "Ambil jadwal lengkap untuk tanggal tertentu.\n\nMengembalikan grid 16 baris (07:00–22:00) × 6 kolom (Court 1–6).\n\nStatus slot:\n- AVAILABLE → slot bisa dipesan\n- BOOKED → slot sudah terisi (PENDING atau CONFIRMED)"
+          }
+        },
+        {
+          "name": "GET Schedule — Tanggal Lain",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/schedule?date=2026-03-05",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "schedule"],
+              "query": [
+                {
+                  "key": "date",
+                  "value": "2026-03-05"
+                }
+              ]
+            },
+            "description": "Contoh melihat jadwal untuk tanggal berbeda (besok)."
+          }
+        },
+        {
+          "name": "GET Schedule — Tanpa Parameter (Default Hari Ini)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/schedule",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "schedule"]
+            },
+            "description": "Tanpa parameter date → otomatis menggunakan tanggal hari ini."
+          }
+        }
+      ]
+    },
+    {
+      "name": "🎯 Booking (Test Simulasi)",
+      "item": [
+        {
+          "name": "POST Book Court — Court 3 Jam 10:00",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('Response punya booking ID', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('id');",
+                  "    pm.expect(json.status).to.equal('CONFIRMED');",
+                  "    // Simpan ID ke collection variable untuk dipakai di request DELETE",
+                  "    pm.collectionVariables.set('bookingId', json.id);",
+                  "    console.log('Booking ID disimpan:', json.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"courtId\": 3,\n  \"date\": \"{{today}}\",\n  \"time\": \"10:00\",\n  \"customerName\": \"Budi Santoso\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/test/book",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "test", "book"]
+            },
+            "description": "Buat booking baru untuk Court 3 jam 10:00.\n\nSetelah request ini:\n1. Booking tersimpan di database dengan status CONFIRMED\n2. WebSocket broadcast dikirim ke semua client yang subscribe\n3. bookingId otomatis tersimpan ke collection variable\n\nField yang diperlukan:\n- courtId: 1–6\n- date: format yyyy-MM-dd\n- time: format HH:mm (07:00 s/d 22:00)\n- customerName: nama pemesan"
+          }
+        },
+        {
+          "name": "POST Book Court — Court 1 Jam 14:00",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', () => pm.response.to.have.status(201));",
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('bookingId', json.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"courtId\": 1,\n  \"date\": \"{{today}}\",\n  \"time\": \"14:00\",\n  \"customerName\": \"Siti Rahayu\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/test/book",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "test", "book"]
+            },
+            "description": "Booking kedua — Court 1 jam 14:00 atas nama Siti Rahayu."
+          }
+        },
+        {
+          "name": "POST Book Court — CONFLICT (Slot Sudah Dipakai)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 409 Conflict (slot sudah dipesan)', () => {",
+                  "    pm.response.to.have.status(409);",
+                  "});",
+                  "pm.test('Error message ada', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('error');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"courtId\": 3,\n  \"date\": \"{{today}}\",\n  \"time\": \"10:00\",\n  \"customerName\": \"Orang Lain\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/test/book",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "test", "book"]
+            },
+            "description": "Coba booking slot yang sama dengan yang sudah terisi.\n\nHarus mengembalikan 409 Conflict dengan pesan error."
+          }
+        },
+        {
+          "name": "POST Book Court — Court Tidak Valid (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 Bad Request', () => {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"courtId\": 99,\n  \"date\": \"{{today}}\",\n  \"time\": \"10:00\",\n  \"customerName\": \"Test User\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/test/book",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "test", "book"]
+            },
+            "description": "Court ID 99 tidak ada di database. Harus mengembalikan 400 Bad Request."
+          }
+        },
+        {
+          "name": "DELETE Cancel Booking (Pakai bookingId dari POST)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Response konfirmasi cancel', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('message');",
+                  "    pm.expect(json.message).to.include('dibatalkan');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/test/book/{{bookingId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "test", "book", "{{bookingId}}"]
+            },
+            "description": "Batalkan booking berdasarkan ID.\n\nbookingId otomatis terisi dari hasil POST sebelumnya.\n\nSetelah request ini:\n1. Status booking berubah ke CANCELLED di database\n2. WebSocket broadcast dikirim → slot kembali AVAILABLE"
+          }
+        },
+        {
+          "name": "DELETE Cancel — ID Tidak Ada (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 Not Found', () => {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/test/book/00000000-0000-0000-0000-000000000000",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "test", "book", "00000000-0000-0000-0000-000000000000"]
+            },
+            "description": "Cancel dengan UUID yang tidak ada di database. Harus mengembalikan 404."
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔬 Verifikasi DB (H2 Console)",
+      "item": [
+        {
+          "name": "GET H2 Console (buka di browser)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/h2-console",
+              "host": ["{{baseUrl}}"],
+              "path": ["h2-console"]
+            },
+            "description": "Buka H2 Console di browser untuk inspect database secara langsung.\n\nKonfigurasi login H2 Console:\n- JDBC URL  : jdbc:h2:mem:gortest\n- User Name : sa\n- Password  : (kosong)\n\nSQL yang berguna:\nSELECT * FROM BOOKINGS;\nSELECT * FROM COURTS;\nSELECT b.*, c.NAME as COURT_NAME FROM BOOKINGS b JOIN COURTS c ON b.COURT_ID = c.ID ORDER BY b.BOOKING_DATE, b.START_TIME;"
+          }
+        }
+      ]
+    }
+  ]
+}
