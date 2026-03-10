@@ -2,6 +2,7 @@ spring:
   datasource:
     # Gunakan koneksi database di PostgreSQL docker lokal
     url: "jdbc:postgresql://localhost:35001/gor-gemilangcondet-dev"
+    url: "jdbc:postgresql://localhost:35001/gor-gemilangcondet-dev"
     username: ${DB_USER:gor-gemilangcondet-dev}
     password: ${DB_PASSWORD:CLI-825.2025X}
   
