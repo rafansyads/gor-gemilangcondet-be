@@ -77,6 +77,12 @@ public class GlobalExceptionHandlerController {
         return ResponseUtil.error("Terlalu banyak request: " + ex.getMessage(), HttpStatus.TOO_MANY_REQUESTS);
     }
 
+    @ExceptionHandler(ExternalServiceException.class)
+    public ResponseEntity<BaseResponseDto<Object>> handleExternalService(ExternalServiceException ex) {
+        return ResponseUtil.error("Layanan eksternal tidak tersedia: " + ex.getMessage(),
+                HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<BaseResponseDto<Object>> handleGeneral(Exception ex) {
         return ResponseUtil.error("Terjadi kesalahan tak terduga: " + ex.getMessage(),

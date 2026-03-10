@@ -16,7 +16,9 @@ import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.AlatOlahragaStatu
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.BarangType;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.Role;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.RoleName;
+import io.mpruy.gor_gemilangcondet.backend_api.entity.Court;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.AlatOlahragaRepository;
+import io.mpruy.gor_gemilangcondet.backend_api.repository.CourtRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.LapanganRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.RoleRepository;
 import lombok.RequiredArgsConstructor;
@@ -37,25 +39,25 @@ public class DataSeeder implements ApplicationRunner {
     private final RoleRepository roleRepository;
     private final LapanganRepository lapanganRepository;
     private final AlatOlahragaRepository alatOlahragaRepository;
+    private final CourtRepository courtRepository;
 
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
         seedRoles();
+        seedCourts();
         seedLapangan(); // nantinya tergantung GOR
         seedAlatOlahraga(); // nantinya tergantung GOR, bisa jadi tidak ada alat olahraga yang disewakan
         resetAllLapanganToTersedia();
     }
 
     /**
-     * Checks each RoleName enum value against the database and inserts any missing
-     * roles.
-     * This method is idempotent and can be safely run on every application startup
-     * without
-     * creating duplicate entries. It ensures that the application always has the
-     * necessary
-     * roles defined for proper authorization handling.
-     * 
+     * Memastikan setiap nilai enum {@link RoleName} memiliki baris yang sesuai di
+     * tabel
+     * {@code roles} sebelum permintaan apapun diproses. Aman dijalankan setiap
+     * startup
+     * — baris yang sudah ada tidak akan diubah.
+     *
      * @see RoleName
      * @see RoleRepository
      */
@@ -64,6 +66,30 @@ public class DataSeeder implements ApplicationRunner {
             if (roleRepository.findByRoleName(roleName).isEmpty()) {
                 roleRepository.save(Role.builder().roleName(roleName).build());
                 log.info("Seeded role: {}", roleName);
+            }
+        }
+    }
+
+    /**
+     * Menyiapkan 6 lapangan (court) yang merepresentasikan lapangan badminton
+     * di GOR Gemilang Condet (id 1–6, nama "Court 1" s/d "Court 6").
+     *
+     * <p>
+     * Metode ini idempotent — jika data sudah ada, tidak akan membuat duplikasi.
+     *
+     * @see Court
+     * @see CourtRepository
+     */
+    private void seedCourts() {
+        for (int i = 1; i <= 6; i++) {
+            final int id = i;
+            if (courtRepository.findById(id).isEmpty()) {
+                Court court = Court.builder()
+                        .id(id)
+                        .name("Court " + id)
+                        .build();
+                courtRepository.save(court);
+                log.info("Seeded court: {} (id={})", court.getName(), court.getId());
             }
         }
     }
@@ -182,8 +208,7 @@ public class DataSeeder implements ApplicationRunner {
         List<AlatOlahraga> equipment = List.of(
                 AlatOlahraga.builder().name("Raket Badminton Premium").type(BarangType.RAKET)
                         .stock(20).price(25000).status(AlatOlahragaStatus.TERSEDIA)
-                        .createdAt(now).updatedAt(now).build()
-        );
+                        .createdAt(now).updatedAt(now).build());
 
         alatOlahragaRepository.saveAll(equipment);
         equipment.forEach(e -> log.info("Seeded alat olahraga: {} ({}) - stok: {}",
