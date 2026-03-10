@@ -57,7 +57,7 @@ class BE2_ScheduleApiUATTest {
     @Test
     @DisplayName("BE1-01 · GET /api/schedule mengembalikan 200 dengan timeSlots tidak kosong")
     void be1_01_scheduleEndpointReturns200WithData() throws Exception {
-        mockMvc.perform(get("/api/schedule").param("date", DATE))
+        mockMvc.perform(get("/schedule").param("date", DATE))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.data.date").value(DATE))
@@ -68,7 +68,7 @@ class BE2_ScheduleApiUATTest {
     @Test
     @DisplayName("BE1-01 · Jam pertama = 07:00, jam terakhir = 22:00")
     void be1_01_gridStartsAt7AndEndsAt22() throws Exception {
-        mockMvc.perform(get("/api/schedule").param("date", DATE))
+        mockMvc.perform(get("/schedule").param("date", DATE))
                 .andExpect(jsonPath("$.data.timeSlots[0].time").value("07:00"))
                 .andExpect(jsonPath("$.data.timeSlots[15].time").value("22:00"));
     }
@@ -76,7 +76,7 @@ class BE2_ScheduleApiUATTest {
     @Test
     @DisplayName("BE1-01 · Setiap baris jam memiliki 6 slot lapangan")
     void be1_01_eachRowHasSixSlots() throws Exception {
-        MvcResult result = mockMvc.perform(get("/api/schedule").param("date", DATE))
+        MvcResult result = mockMvc.perform(get("/schedule").param("date", DATE))
                 .andReturn();
 
         var body = objectMapper.readTree(result.getResponse().getContentAsString());
@@ -105,13 +105,13 @@ class BE2_ScheduleApiUATTest {
                 "time", "10:00",
                 "customerName", "Tono"));
 
-        mockMvc.perform(post("/api/test/book")
+        mockMvc.perform(post("/test/book")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(bookingBody))
                 .andExpect(status().isCreated());
 
         // Act: GET jadwal dari "klien baru"
-        MvcResult result = mockMvc.perform(get("/api/schedule").param("date", DATE))
+        MvcResult result = mockMvc.perform(get("/schedule").param("date", DATE))
                 .andReturn();
 
         var body = objectMapper.readTree(result.getResponse().getContentAsString());
@@ -136,7 +136,7 @@ class BE2_ScheduleApiUATTest {
     @Test
     @DisplayName("BE2-03 · Respons jadwal memuat field: date, lastUpdated, timeSlots")
     void be2_03_responseHasAllRequiredTopLevelFields() throws Exception {
-        mockMvc.perform(get("/api/schedule").param("date", DATE))
+        mockMvc.perform(get("/schedule").param("date", DATE))
                 .andExpect(jsonPath("$.data.date").exists())
                 .andExpect(jsonPath("$.data.lastUpdated").exists())
                 .andExpect(jsonPath("$.data.timeSlots").exists());
@@ -145,7 +145,7 @@ class BE2_ScheduleApiUATTest {
     @Test
     @DisplayName("BE2-03 · Setiap slot memuat: courtName, status, lapanganId")
     void be2_03_eachSlotHasRequiredFields() throws Exception {
-        MvcResult result = mockMvc.perform(get("/api/schedule").param("date", DATE))
+        MvcResult result = mockMvc.perform(get("/schedule").param("date", DATE))
                 .andReturn();
 
         var body = objectMapper.readTree(result.getResponse().getContentAsString());
@@ -168,19 +168,19 @@ class BE2_ScheduleApiUATTest {
         // Arrange: buat booking pertama
         String body = objectMapper.writeValueAsString(Map.of(
                 "courtId", 2, "date", DATE, "time", "11:00", "customerName", "A"));
-        mockMvc.perform(post("/api/test/book").contentType(MediaType.APPLICATION_JSON).content(body))
+        mockMvc.perform(post("/test/book").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated());
 
         // Act: booking duplikat di slot yang sama
         String dupBody = objectMapper.writeValueAsString(Map.of(
                 "courtId", 2, "date", DATE, "time", "11:00", "customerName", "B"));
-        mockMvc.perform(post("/api/test/book").contentType(MediaType.APPLICATION_JSON).content(dupBody))
+        mockMvc.perform(post("/test/book").contentType(MediaType.APPLICATION_JSON).content(dupBody))
                 .andExpect(status().isConflict());
 
         // Assert: jadwal masih bisa diambil (tidak ada error)
-        mockMvc.perform(get("/api/schedule").param("date", DATE))
+        mockMvc.perform(get("/schedule").param("date", DATE))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.timeSlots.length()").value(16));
+                .andExpect(jsonPath("$.data.timeSlots.length()").value(16));
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -190,7 +190,7 @@ class BE2_ScheduleApiUATTest {
     @Test
     @DisplayName("FE3-01 · Respons selalu memuat field lastUpdated (tidak null)")
     void fe3_01_lastUpdatedFieldAlwaysPresent() throws Exception {
-        MvcResult result = mockMvc.perform(get("/api/schedule").param("date", DATE))
+        MvcResult result = mockMvc.perform(get("/schedule").param("date", DATE))
                 .andReturn();
 
         var body = objectMapper.readTree(result.getResponse().getContentAsString());
@@ -201,8 +201,8 @@ class BE2_ScheduleApiUATTest {
     @Test
     @DisplayName("FE3-03 · Dua GET berurutan (manual refresh) mengembalikan data konsisten")
     void fe3_03_twoConsecutiveGetsReturnConsistentData() throws Exception {
-        MvcResult first = mockMvc.perform(get("/api/schedule").param("date", DATE)).andReturn();
-        MvcResult second = mockMvc.perform(get("/api/schedule").param("date", DATE)).andReturn();
+        MvcResult first = mockMvc.perform(get("/schedule").param("date", DATE)).andReturn();
+        MvcResult second = mockMvc.perform(get("/schedule").param("date", DATE)).andReturn();
 
         var bodyFirst = objectMapper.readTree(first.getResponse().getContentAsString());
         var bodySecond = objectMapper.readTree(second.getResponse().getContentAsString());
@@ -219,7 +219,7 @@ class BE2_ScheduleApiUATTest {
         // Buat booking terlebih dahulu
         String body = objectMapper.writeValueAsString(Map.of(
                 "courtId", 5, "date", DATE, "time", "17:00", "customerName", "Tari"));
-        MvcResult createResult = mockMvc.perform(post("/api/test/book")
+        MvcResult createResult = mockMvc.perform(post("/test/book")
                 .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated())
                 .andReturn();
@@ -228,7 +228,7 @@ class BE2_ScheduleApiUATTest {
                 .get("data").get("id").asText();
 
         // DELETE — batalkan booking
-        mockMvc.perform(delete("/api/test/book/" + bookingId))
+        mockMvc.perform(delete("/test/book/" + bookingId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").exists());
     }
@@ -236,7 +236,7 @@ class BE2_ScheduleApiUATTest {
     @Test
     @DisplayName("TestBookingController · DELETE dengan ID tidak ada mengembalikan 404")
     void testController_cancelNonExistentBookingReturns404() throws Exception {
-        mockMvc.perform(delete("/api/test/book/" + java.util.UUID.randomUUID()))
+        mockMvc.perform(delete("/test/book/" + java.util.UUID.randomUUID()))
                 .andExpect(status().isNotFound());
     }
 
@@ -246,11 +246,11 @@ class BE2_ScheduleApiUATTest {
         // Buat booking dulu
         String bookingBody = objectMapper.writeValueAsString(Map.of(
                 "courtId", 3, "date", DATE, "time", "08:00", "customerName", "Rani"));
-        mockMvc.perform(post("/api/test/book").contentType(MediaType.APPLICATION_JSON).content(bookingBody))
+        mockMvc.perform(post("/test/book").contentType(MediaType.APPLICATION_JSON).content(bookingBody))
                 .andExpect(status().isCreated());
 
         // GET jadwal tanpa Authorization header
-        MvcResult result = mockMvc.perform(get("/api/schedule").param("date", DATE)).andReturn();
+        MvcResult result = mockMvc.perform(get("/schedule").param("date", DATE)).andReturn();
         var body = objectMapper.readTree(result.getResponse().getContentAsString());
 
         for (var row : body.get("data").get("timeSlots")) {
