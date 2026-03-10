@@ -24,8 +24,6 @@ spring:
   jackson:
     date-format: dd-MM-yyyy HH:mm:ss
     time-zone: Asia/Jakarta
-    serialization:
-      write-dates-as-timestamps: false
 
   # Driver Database (Sama-sama Postgres buat Dev & Prod)
   datasource:

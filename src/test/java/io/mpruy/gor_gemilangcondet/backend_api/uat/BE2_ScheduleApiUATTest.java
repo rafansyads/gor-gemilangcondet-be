@@ -24,12 +24,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * UAT — PBI-BE2: Broadcast + REST API Jadwal
  *
  * Skenario yang dicakup:
- *   BE1-01 · Endpoint jadwal merespons dengan 200 dan data timeSlots
- *   BE2-02 · Klien baru mendapat data terkini (REST API mengembalikan snapshot terkini)
- *   BE2-03 · Pesan berisi date, timeSlots, lastUpdated
- *   BE2-04 · Booking baru tidak menghambat request jadwal lain (conflict → 409)
- *   FE3-01 · Respons memuat field lastUpdated
- *   FE3-03 · Manual refresh (GET ulang) mengembalikan data segar
+ * BE1-01 · Endpoint jadwal merespons dengan 200 dan data timeSlots
+ * BE2-02 · Klien baru mendapat data terkini (REST API mengembalikan snapshot
+ * terkini)
+ * BE2-03 · Pesan berisi date, timeSlots, lastUpdated
+ * BE2-04 · Booking baru tidak menghambat request jadwal lain (conflict → 409)
+ * FE3-01 · Respons memuat field lastUpdated
+ * FE3-03 · Manual refresh (GET ulang) mengembalikan data segar
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @ActiveProfiles("h2test")
@@ -37,7 +38,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("BE2 · Schedule REST API Integration UAT")
 class BE2_ScheduleApiUATTest {
 
-    @Autowired private WebApplicationContext context;
+    @Autowired
+    private WebApplicationContext context;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private MockMvc mockMvc;
@@ -58,17 +60,17 @@ class BE2_ScheduleApiUATTest {
         mockMvc.perform(get("/api/schedule").param("date", DATE))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.date").value(DATE))
-                .andExpect(jsonPath("$.timeSlots").isArray())
-                .andExpect(jsonPath("$.timeSlots.length()").value(16));
+                .andExpect(jsonPath("$.data.date").value(DATE))
+                .andExpect(jsonPath("$.data.timeSlots").isArray())
+                .andExpect(jsonPath("$.data.timeSlots.length()").value(16));
     }
 
     @Test
     @DisplayName("BE1-01 · Jam pertama = 07:00, jam terakhir = 22:00")
     void be1_01_gridStartsAt7AndEndsAt22() throws Exception {
         mockMvc.perform(get("/api/schedule").param("date", DATE))
-                .andExpect(jsonPath("$.timeSlots[0].time").value("07:00"))
-                .andExpect(jsonPath("$.timeSlots[15].time").value("22:00"));
+                .andExpect(jsonPath("$.data.timeSlots[0].time").value("07:00"))
+                .andExpect(jsonPath("$.data.timeSlots[15].time").value("22:00"));
     }
 
     @Test
@@ -78,7 +80,7 @@ class BE2_ScheduleApiUATTest {
                 .andReturn();
 
         var body = objectMapper.readTree(result.getResponse().getContentAsString());
-        var timeSlots = body.get("timeSlots");
+        var timeSlots = body.get("data").get("timeSlots");
 
         assertThat(timeSlots.isArray()).isTrue();
         for (var row : timeSlots) {
@@ -101,12 +103,11 @@ class BE2_ScheduleApiUATTest {
                 "courtId", 1,
                 "date", DATE,
                 "time", "10:00",
-                "customerName", "Tono"
-        ));
+                "customerName", "Tono"));
 
         mockMvc.perform(post("/api/test/book")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(bookingBody))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(bookingBody))
                 .andExpect(status().isCreated());
 
         // Act: GET jadwal dari "klien baru"
@@ -117,7 +118,7 @@ class BE2_ScheduleApiUATTest {
 
         // Assert: slot jam 10:00 lapangan 1 berstatus BOOKED
         boolean found = false;
-        for (var row : body.get("timeSlots")) {
+        for (var row : body.get("data").get("timeSlots")) {
             if ("10:00".equals(row.get("time").asText())) {
                 var firstSlot = row.get("slots").get(0);
                 assertThat(firstSlot.get("status").asText()).isEqualTo("BOOKED");
@@ -136,9 +137,9 @@ class BE2_ScheduleApiUATTest {
     @DisplayName("BE2-03 · Respons jadwal memuat field: date, lastUpdated, timeSlots")
     void be2_03_responseHasAllRequiredTopLevelFields() throws Exception {
         mockMvc.perform(get("/api/schedule").param("date", DATE))
-                .andExpect(jsonPath("$.date").exists())
-                .andExpect(jsonPath("$.lastUpdated").exists())
-                .andExpect(jsonPath("$.timeSlots").exists());
+                .andExpect(jsonPath("$.data.date").exists())
+                .andExpect(jsonPath("$.data.lastUpdated").exists())
+                .andExpect(jsonPath("$.data.timeSlots").exists());
     }
 
     @Test
@@ -149,7 +150,7 @@ class BE2_ScheduleApiUATTest {
 
         var body = objectMapper.readTree(result.getResponse().getContentAsString());
 
-        for (var row : body.get("timeSlots")) {
+        for (var row : body.get("data").get("timeSlots")) {
             for (var slot : row.get("slots")) {
                 assertThat(slot.has("courtName")).isTrue();
                 assertThat(slot.has("status")).isTrue();
@@ -166,15 +167,13 @@ class BE2_ScheduleApiUATTest {
     void be2_04_duplicateBookingReturnConflict() throws Exception {
         // Arrange: buat booking pertama
         String body = objectMapper.writeValueAsString(Map.of(
-                "courtId", 2, "date", DATE, "time", "11:00", "customerName", "A"
-        ));
+                "courtId", 2, "date", DATE, "time", "11:00", "customerName", "A"));
         mockMvc.perform(post("/api/test/book").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated());
 
         // Act: booking duplikat di slot yang sama
         String dupBody = objectMapper.writeValueAsString(Map.of(
-                "courtId", 2, "date", DATE, "time", "11:00", "customerName", "B"
-        ));
+                "courtId", 2, "date", DATE, "time", "11:00", "customerName", "B"));
         mockMvc.perform(post("/api/test/book").contentType(MediaType.APPLICATION_JSON).content(dupBody))
                 .andExpect(status().isConflict());
 
@@ -195,23 +194,23 @@ class BE2_ScheduleApiUATTest {
                 .andReturn();
 
         var body = objectMapper.readTree(result.getResponse().getContentAsString());
-        assertThat(body.get("lastUpdated").isNull()).isFalse();
-        assertThat(body.get("lastUpdated").asText()).isNotBlank();
+        assertThat(body.get("data").get("lastUpdated").isNull()).isFalse();
+        assertThat(body.get("data").get("lastUpdated").asText()).isNotBlank();
     }
 
     @Test
     @DisplayName("FE3-03 · Dua GET berurutan (manual refresh) mengembalikan data konsisten")
     void fe3_03_twoConsecutiveGetsReturnConsistentData() throws Exception {
-        MvcResult first  = mockMvc.perform(get("/api/schedule").param("date", DATE)).andReturn();
+        MvcResult first = mockMvc.perform(get("/api/schedule").param("date", DATE)).andReturn();
         MvcResult second = mockMvc.perform(get("/api/schedule").param("date", DATE)).andReturn();
 
-        var bodyFirst  = objectMapper.readTree(first.getResponse().getContentAsString());
+        var bodyFirst = objectMapper.readTree(first.getResponse().getContentAsString());
         var bodySecond = objectMapper.readTree(second.getResponse().getContentAsString());
 
-        assertThat(bodyFirst.get("timeSlots").size())
-                .isEqualTo(bodySecond.get("timeSlots").size());
-        assertThat(bodyFirst.get("date").asText())
-                .isEqualTo(bodySecond.get("date").asText());
+        assertThat(bodyFirst.get("data").get("timeSlots").size())
+                .isEqualTo(bodySecond.get("data").get("timeSlots").size());
+        assertThat(bodyFirst.get("data").get("date").asText())
+                .isEqualTo(bodySecond.get("data").get("date").asText());
     }
 
     @Test
@@ -219,15 +218,14 @@ class BE2_ScheduleApiUATTest {
     void testController_cancelBookingReturnsOk() throws Exception {
         // Buat booking terlebih dahulu
         String body = objectMapper.writeValueAsString(Map.of(
-                "courtId", 5, "date", DATE, "time", "17:00", "customerName", "Tari"
-        ));
+                "courtId", 5, "date", DATE, "time", "17:00", "customerName", "Tari"));
         MvcResult createResult = mockMvc.perform(post("/api/test/book")
-                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isCreated())
                 .andReturn();
 
         String bookingId = objectMapper.readTree(createResult.getResponse().getContentAsString())
-                .get("id").asText();
+                .get("data").get("id").asText();
 
         // DELETE — batalkan booking
         mockMvc.perform(delete("/api/test/book/" + bookingId))
@@ -247,8 +245,7 @@ class BE2_ScheduleApiUATTest {
     void noAuth_allBookerNamesAreNull() throws Exception {
         // Buat booking dulu
         String bookingBody = objectMapper.writeValueAsString(Map.of(
-                "courtId", 3, "date", DATE, "time", "08:00", "customerName", "Rani"
-        ));
+                "courtId", 3, "date", DATE, "time", "08:00", "customerName", "Rani"));
         mockMvc.perform(post("/api/test/book").contentType(MediaType.APPLICATION_JSON).content(bookingBody))
                 .andExpect(status().isCreated());
 
@@ -256,7 +253,7 @@ class BE2_ScheduleApiUATTest {
         MvcResult result = mockMvc.perform(get("/api/schedule").param("date", DATE)).andReturn();
         var body = objectMapper.readTree(result.getResponse().getContentAsString());
 
-        for (var row : body.get("timeSlots")) {
+        for (var row : body.get("data").get("timeSlots")) {
             for (var slot : row.get("slots")) {
                 if ("BOOKED".equals(slot.get("status").asText())) {
                     var bookerNode = slot.path("bookerName");
