@@ -12,10 +12,12 @@ import io.mpruy.gor_gemilangcondet.backend_api.entity.Booking;
 import io.mpruy.gor_gemilangcondet.backend_api.entity.Court;
 import io.mpruy.gor_gemilangcondet.backend_api.enums.BookingStatus;
 import io.mpruy.gor_gemilangcondet.backend_api.event.BookingStatusChangedEvent;
+import io.mpruy.gor_gemilangcondet.backend_api.exception.ExternalServiceException;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.BookingRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.CourtRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.security.JwtRoleExtractor;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,20 +35,23 @@ import java.util.UUID;
 /**
  * Core service untuk fitur Jadwal Real-Time GOR Gemilang Condet.
  *
- * <p>Bertanggung jawab atas:
+ * <p>
+ * Bertanggung jawab atas:
  * <ol>
- *   <li>Membangun grid jadwal (waktu × lapangan) dari data booking di database.</li>
- *   <li>Menyimpan perubahan status booking dan menerbitkan event agar
- *       WebSocket broadcast dijalankan.</li>
+ * <li>Membangun grid jadwal (waktu × lapangan) dari data booking di
+ * database.</li>
+ * <li>Menyimpan perubahan status booking dan menerbitkan event agar
+ * WebSocket broadcast dijalankan.</li>
  * </ol>
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ScheduleService {
 
     /** Jam buka GOR (inklusif) */
-    static final LocalTime OPEN_TIME  = LocalTime.of(7, 0);
+    static final LocalTime OPEN_TIME = LocalTime.of(7, 0);
     /** Jam tutup GOR (inklusif, slot 22:00 = malam) */
     static final LocalTime CLOSE_TIME = LocalTime.of(22, 0);
 
@@ -54,14 +59,13 @@ public class ScheduleService {
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     /** Status booking yang dianggap OCCUPIED (slot tidak tersedia) */
-    private static final List<BookingStatus> ACTIVE_STATUSES =
-            List.of(BookingStatus.PENDING, BookingStatus.CONFIRMED);
+    private static final List<BookingStatus> ACTIVE_STATUSES = List.of(BookingStatus.PENDING, BookingStatus.CONFIRMED);
 
-    private final CourtRepository           courtRepository;
-    private final BookingRepository         bookingRepository;
+    private final CourtRepository courtRepository;
+    private final BookingRepository bookingRepository;
     private final ApplicationEventPublisher eventPublisher;
-    private final ReservasiClient           reservasiClient;
-    private final JwtRoleExtractor          jwtRoleExtractor;
+    private final ReservasiClient reservasiClient;
+    private final JwtRoleExtractor jwtRoleExtractor;
 
     // ──────────────────────────────────────────────────────────────────────────
     // PUBLIC API
@@ -82,7 +86,7 @@ public class ScheduleService {
      */
     public ScheduleResponse getSchedule(LocalDate date, boolean showBookerName) {
 
-        List<Court>   courts   = courtRepository.findAll();
+        List<Court> courts = courtRepository.findAll();
         List<Booking> bookings = bookingRepository.findActiveByDate(date, ACTIVE_STATUSES);
 
         // Buat lookup cepat: (courtId, startTime) → Booking
@@ -95,7 +99,7 @@ public class ScheduleService {
             List<ScheduleSlotResponse> slots = new ArrayList<>();
 
             for (Court court : courts) {
-                String key    = slotKey(court.getId(), t);
+                String key = slotKey(court.getId(), t);
                 Booking found = bookingMap.get(key);
 
                 slots.add(buildSlot(court, found, showBookerName));
@@ -119,8 +123,9 @@ public class ScheduleService {
      * yang bergantung pada role pemanggil.
      *
      * <ul>
-     *   <li>ADMIN / OWNER / STAF_LAPANGAN → {@code bookerName} berisi {@code namaWakil}</li>
-     *   <li>Role lain / anonim → {@code bookerName} null (disembunyikan)</li>
+     * <li>ADMIN / OWNER / STAF_LAPANGAN → {@code bookerName} berisi
+     * {@code namaWakil}</li>
+     * <li>Role lain / anonim → {@code bookerName} null (disembunyikan)</li>
      * </ul>
      *
      * @param date tanggal jadwal
@@ -131,7 +136,13 @@ public class ScheduleService {
         boolean showBookerName = jwtRoleExtractor.canViewBookerName(role);
 
         // 1. Ambil ketersediaan per lapangan dari Fadhil
-        List<FadhilCourtAvailabilityDto> courts = reservasiClient.getAvailability(date);
+        List<FadhilCourtAvailabilityDto> courts;
+        try {
+            courts = reservasiClient.getAvailability(date);
+        } catch (ExternalServiceException ex) {
+            log.warn("[SCHEDULE] Fallback ke data lokal karena Fadhil tidak tersedia: {}", ex.getMessage());
+            return getSchedule(date, showBookerName);
+        }
 
         // Fallback: jika Fadhil tidak tersedia, gunakan data lokal (H2 DB)
         if (courts == null || courts.isEmpty()) {
@@ -139,16 +150,18 @@ public class ScheduleService {
         }
 
         // 2. Jika admin, ambil daftar reservasi untuk lookup namaWakil
-        //    Key: "<lapanganId>_<startHour>"  →  namaWakil
+        // Key: "<lapanganId>_<startHour>" → namaWakil
         Map<String, String> bookerMap = new HashMap<>();
         if (showBookerName) {
             List<FadhilReservasiDto> reservations = reservasiClient.getAllReservations();
             for (FadhilReservasiDto r : reservations) {
-                if (r.getReservationStart() == null || r.getLapanganId() == null) continue;
+                if (r.getReservationStart() == null || r.getLapanganId() == null)
+                    continue;
                 // Iterasi setiap jam yang dicakup reservasi
                 int startHour = r.getReservationStart().getHour();
-                int endHour   = (r.getReservationEnd() != null)
-                        ? r.getReservationEnd().getHour() : startHour + 1;
+                int endHour = (r.getReservationEnd() != null)
+                        ? r.getReservationEnd().getHour()
+                        : startHour + 1;
                 for (int h = startHour; h < endHour; h++) {
                     String key = r.getLapanganId().toString() + "_" + h;
                     bookerMap.put(key, r.getNamaWakil());
@@ -157,18 +170,20 @@ public class ScheduleService {
         }
 
         // 3. Bangun grid jadwal berdasarkan data Fadhil
-        //    Susun slot per-jam, semua lapangan dalam satu baris waktu
-        //    Kumpulkan jam dari slot yang tersedia/terisi
+        // Susun slot per-jam, semua lapangan dalam satu baris waktu
+        // Kumpulkan jam dari slot yang tersedia/terisi
         Map<Integer, List<ScheduleSlotResponse>> rowMap = new HashMap<>();
 
         for (FadhilCourtAvailabilityDto court : courts) {
-            if (court.getSlots() == null) continue;
+            if (court.getSlots() == null)
+                continue;
             for (FadhilSlotDto slot : court.getSlots()) {
                 int hour = slot.getStartHour();
                 rowMap.computeIfAbsent(hour, k -> new ArrayList<>());
 
                 String lapanganIdStr = court.getLapanganId() != null
-                        ? court.getLapanganId().toString() : null;
+                        ? court.getLapanganId().toString()
+                        : null;
 
                 if (slot.isAvailable()) {
                     rowMap.get(hour).add(ScheduleSlotResponse.builder()
@@ -179,7 +194,8 @@ public class ScheduleService {
                             .build());
                 } else {
                     String bookerName = showBookerName
-                            ? bookerMap.get(lapanganIdStr + "_" + hour) : null;
+                            ? bookerMap.get(lapanganIdStr + "_" + hour)
+                            : null;
                     rowMap.get(hour).add(ScheduleSlotResponse.builder()
                             .lapanganId(lapanganIdStr)
                             .courtName(court.getLapanganName())
@@ -242,7 +258,8 @@ public class ScheduleService {
      * Buat booking baru (digunakan oleh endpoint test simulasi).
      * Langsung berstatus CONFIRMED dan memicu broadcast WebSocket.
      *
-     * @throws IllegalArgumentException jika lapangan tidak ditemukan atau slot sudah terisi
+     * @throws IllegalArgumentException jika lapangan tidak ditemukan atau slot
+     *                                  sudah terisi
      */
     @Transactional
     public Booking createTestBooking(Integer courtId, LocalDate date, LocalTime time, String customerName) {
