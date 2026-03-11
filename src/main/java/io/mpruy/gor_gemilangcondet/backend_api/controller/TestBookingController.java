@@ -71,8 +71,8 @@ public class TestBookingController {
 
         Map<String, Object> data = Map.of(
                 "id", booking.getId().toString(),
-                "courtId", booking.getCourt().getId(),
-                "courtName", booking.getCourt().getName(),
+                "lapanganId", booking.getLapangan().getId().toString(),
+                "courtName", booking.getLapangan().getName(),
                 "date", booking.getBookingDate().toString(),
                 "time", booking.getStartTime().toString(),
                 "customerName", booking.getCustomerName(),

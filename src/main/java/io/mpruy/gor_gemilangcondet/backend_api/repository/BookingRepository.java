@@ -20,10 +20,10 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
      */
     @Query("""
         SELECT b FROM Booking b
-        JOIN FETCH b.court
+        JOIN FETCH b.lapangan
         WHERE b.bookingDate = :date
           AND b.status IN :statuses
-        ORDER BY b.court.id ASC, b.startTime ASC
+        ORDER BY b.lapangan.name ASC, b.startTime ASC
         """)
     List<Booking> findActiveByDate(
             @Param("date") LocalDate date,

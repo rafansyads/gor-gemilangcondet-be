@@ -36,7 +36,7 @@ public class ScheduleUpdateMessage {
     /** Format "yyyy-MM-dd" */
     private String date;
 
-    private Integer courtId;
+    private String lapanganId;
     private String  courtName;
 
     /** Format "HH:mm" */
