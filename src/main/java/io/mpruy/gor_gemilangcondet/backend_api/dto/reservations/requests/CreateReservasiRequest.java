@@ -28,6 +28,8 @@ public class CreateReservasiRequest {
     private String namaWakil;
 
     @NotBlank(message = "Nomor telepon wajib diisi")
+    @Pattern(regexp = "^[0-9]+$", message = "Nomor telepon hanya boleh berisi angka")
+    @Size(min = 9, max = 15, message = "Nomor telepon harus antara 9-15 digit")
     private String nomorTelepon;
 
     @Min(value = 1, message = "Jumlah orang minimal 1")
