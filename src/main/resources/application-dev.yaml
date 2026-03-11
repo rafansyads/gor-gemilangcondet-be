@@ -20,7 +20,7 @@ spring:
 # Konfigurasi JWT untuk development (jangan dipakai sama di production!)
 app:
   jwt:
-    secret: ${JWT_SECRET}
+    secret: ${JWT_SECRET:dev-secret-key} # Ganti dengan secret yang lebih kuat di production!
     expiration: 86400000 # 24 Jam
 
   upload:
