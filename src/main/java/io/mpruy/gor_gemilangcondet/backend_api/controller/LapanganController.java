@@ -12,12 +12,14 @@ import io.mpruy.gor_gemilangcondet.backend_api.util.ResponseUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
 
+@CrossOrigin
 @RestController
 @RequestMapping("/courts")
 @RequiredArgsConstructor
@@ -43,6 +45,7 @@ public class LapanganController {
     // POST /courts — Create a new court
     // ──────────────────────────────────────────────────────────────────────────
 
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'STAF_LAPANGAN')")
     @PostMapping
     public ResponseEntity<BaseResponseDto<LapanganResponse>> createCourt(
             @Validated @RequestBody BaseRequestDto<CreateLapanganRequest> request) {
@@ -55,6 +58,7 @@ public class LapanganController {
     // PUT /courts/{id} — Update court
     // ──────────────────────────────────────────────────────────────────────────
 
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'STAF_LAPANGAN')")
     @PutMapping("/{id}")
     public ResponseEntity<BaseResponseDto<LapanganResponse>> updateCourt(
             @PathVariable UUID id,
@@ -68,6 +72,7 @@ public class LapanganController {
     // DELETE /courts/{id} — Delete court
     // ──────────────────────────────────────────────────────────────────────────
 
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'STAF_LAPANGAN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<BaseResponseDto<Object>> deleteCourt(@PathVariable UUID id) {
         reservasiService.deleteCourt(id);
@@ -79,6 +84,7 @@ public class LapanganController {
     // PATCH /courts/{id}/status — Activate / Deactivate court
     // ──────────────────────────────────────────────────────────────────────────
 
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'STAF_LAPANGAN')")
     @PatchMapping("/{id}/status")
     public ResponseEntity<BaseResponseDto<LapanganResponse>> updateCourtStatus(
             @PathVariable UUID id,

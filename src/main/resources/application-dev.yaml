@@ -27,3 +27,5 @@ app:
     dir: uploads/payment-proofs
   fadhil:
     base-url: ${FADHIL_BASE_URL:http://localhost:8080/api}
+  cors:
+    allowed-origins: http://localhost:3000,http://localhost:3001
