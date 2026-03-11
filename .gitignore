@@ -36,6 +36,11 @@ out/
 ### VS Code ###
 .vscode/
 
+### Environment Variables ###
+.env
+.env.*
+!.env.example
+
 # Created by http://gitignore.io
 
 ### Windows ###

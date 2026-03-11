@@ -2,12 +2,16 @@ package io.mpruy.gor_gemilangcondet.backend_api.service;
 
 import io.mpruy.gor_gemilangcondet.backend_api.dto.users.UserDto;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.users.requests.UpdateProfileRequest;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.users.responses.UpdateProfileResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.User;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.ConflictException;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.ResourceNotFoundException;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.UserRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.security.UserDetailsImpl;
+import io.mpruy.gor_gemilangcondet.backend_api.security.jwt.JwtUtils;
+import io.mpruy.gor_gemilangcondet.backend_api.security.service.RefreshTokenService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -22,6 +26,8 @@ import java.util.stream.Collectors;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final JwtUtils jwtUtils;
+    private final RefreshTokenService refreshTokenService;
 
     // ──────────────────────────────────────────────────────────────────────────
     // Queries
@@ -55,15 +61,21 @@ public class UserService {
     /**
      * Updates the currently authenticated user's username and email.
      * Both fields must remain unique across all users.
+     * <p>
+     * When the username changes the existing JWT becomes invalid (its subject
+     * no longer matches the DB), so this method issues a fresh access token
+     * and refresh token keyed to the new username, and updates the
+     * SecurityContext so the rest of the request sees the new identity.
      *
      * @param request the new username and email
-     * @return updated user DTO
+     * @return updated user DTO together with fresh auth tokens
      */
     @Transactional
-    public UserDto updateProfile(UpdateProfileRequest request) {
+    public UpdateProfileResponse updateProfile(UpdateProfileRequest request) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
         User currentUser = userDetails.getUser();
+        String oldUsername = currentUser.getUsername();
 
         // Re-fetch to get a managed entity in the current persistence context
         User user = userRepository.findById(currentUser.getId())
@@ -81,7 +93,26 @@ public class UserService {
         user.setEmail(request.getEmail());
         User updated = userRepository.save(user);
 
-        return toDto(updated);
+        // Build new UserDetails with the updated user entity
+        UserDetailsImpl newUserDetails = new UserDetailsImpl(updated);
+
+        // Issue fresh tokens with the new username
+        String newAccessToken = jwtUtils.generateAccessToken(newUserDetails);
+
+        // Rotate refresh token: revoke old username's token, create one for new username
+        refreshTokenService.deleteRefreshTokenByUsername(oldUsername);
+        String newRefreshToken = refreshTokenService.createRefreshToken(updated.getUsername());
+
+        // Update SecurityContext so subsequent filters/code in this request see the new principal
+        UsernamePasswordAuthenticationToken newAuth =
+                new UsernamePasswordAuthenticationToken(newUserDetails, null, newUserDetails.getAuthorities());
+        SecurityContextHolder.getContext().setAuthentication(newAuth);
+
+        return UpdateProfileResponse.builder()
+                .user(toDto(updated))
+                .accessToken(newAccessToken)
+                .refreshToken(newRefreshToken)
+                .build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
