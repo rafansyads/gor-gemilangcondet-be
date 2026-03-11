@@ -18,9 +18,9 @@ public class CorsConfig {
     private static final String DEV_FRONTEND_ORIGIN = "http://localhost:3000"; // Vue dev server
 
     // Provide a safe default for local/dev if env var is absent.
-    // In production, set CORS_ALLOWED_ORIGINS to a comma-separated list, e.g.
+    // In production, set ALLOWED_ORIGINS to a comma-separated list, e.g.
     // https://app.example.com,https://admin.example.com
-    @Value("${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000,http://localhost:3001}")
+    @Value("${ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000,http://localhost:3001}")
     private String allowedOrigins;
 
     /**
