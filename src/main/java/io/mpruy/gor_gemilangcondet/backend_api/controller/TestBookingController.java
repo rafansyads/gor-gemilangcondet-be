@@ -24,7 +24,7 @@ import java.util.UUID;
  * production.
  *
  * <h3>Endpoints</h3>
- * 
+ *
  * <pre>
  * POST   /api/test/book        — Buat booking baru, langsung CONFIRMED
  * DELETE /api/test/book/{id}   — Batalkan booking (status → CANCELLED)
@@ -43,7 +43,7 @@ public class TestBookingController {
      *
      * <p>
      * Request body (JSON):
-     * 
+     *
      * <pre>
      * {
      *   "courtId"      : 3,

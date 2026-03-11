@@ -17,7 +17,7 @@ import java.time.LocalDate;
  * REST endpoint untuk fitur Jadwal Real-Time.
  *
  * <h3>Endpoint</h3>
- * 
+ *
  * <pre>
  * GET /api/schedule?date=yyyy-MM-dd
  * </pre>
