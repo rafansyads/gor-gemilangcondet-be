@@ -3,7 +3,6 @@ package io.mpruy.gor_gemilangcondet.backend_api.controller;
 import io.mpruy.gor_gemilangcondet.backend_api.entity.Booking;
 import io.mpruy.gor_gemilangcondet.backend_api.service.ScheduleService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

@@ -19,6 +19,13 @@ spring:
     jcache:
       provider: com.github.benmanes.caffeine.jcache.spi.CaffeineCachingProvider
 
+  # Cache (dipakai Bucket4j untuk rate limiting)
+  cache:
+    type: jcache
+    cache-names: rate-limit-buckets
+    jcache:
+      provider: com.github.benmanes.caffeine.jcache.spi.CaffeineCachingProvider
+
   # Pengaturan Format Tanggal (Penting buat Booking)
   jackson:
     date-format: dd-MM-yyyy HH:mm:ss
@@ -35,8 +42,45 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
   # Default Profile: Kalau tidak disetting apa-apa, anggap mode DEV
+  # Default Profile: Kalau tidak disetting apa-apa, anggap mode DEV
   profiles:
     active: dev
+
+# Bucket4j Configuration untuk Rate Limiting
+bucket4j:
+  enabled: true
+  filters:
+    - cache-name: rate-limit-buckets
+      filter-method: servlet
+      filter-order: 1
+      http-response-body: '{"status": 429, "message": "Terlalu banyak permintaan. Silakan coba lagi dalam beberapa menit.", "timestamp": null, "data": null}'
+      rate-limits:
+        # ATURAN 1: Authentication (Login, Register, Logout) - Sangat Ketat
+        - execute-condition: "request.getRequestURI().startsWith('/api/auth')"
+          cache-key: "getRemoteAddr()"
+          bandwidths:
+            - capacity: 5
+              time: 1
+              unit: minutes
+
+        # ATURAN 2: Create, Update, Delete (CUD) - Sedang
+        # Ditambah pengecualian: HANYA JIKA BUKAN /api/auth
+        - execute-condition: "request.getMethod().matches('POST|PUT|DELETE') && !request.getRequestURI().startsWith('/api/auth')"
+          cache-key: "getRemoteAddr()"
+          bandwidths:
+            - capacity: 20
+              time: 1
+              unit: minutes
+
+        # ATURAN 3: Read-Only (GET) - Longgar
+        # Ditambah pengecualian: HANYA JIKA BUKAN /api/auth
+        - execute-condition: "request.getMethod().equals('GET') && !request.getRequestURI().startsWith('/api/auth')"
+          cache-key: "getRemoteAddr()"
+          bandwidths:
+            - capacity: 100
+              time: 1
+              unit: minutes
+
 
 # Bucket4j Configuration untuk Rate Limiting
 bucket4j:

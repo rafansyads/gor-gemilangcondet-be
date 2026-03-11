@@ -46,7 +46,6 @@ public class DataSeeder implements ApplicationRunner {
         seedRoles();
         seedLapangan(); // nantinya tergantung GOR
         seedAlatOlahraga(); // nantinya tergantung GOR, bisa jadi tidak ada alat olahraga yang disewakan
-        resetAllLapanganToTersedia();
     }
 
     /**
@@ -153,24 +152,6 @@ public class DataSeeder implements ApplicationRunner {
 
         lapanganRepository.saveAll(courts);
         courts.forEach(c -> log.info("Seeded lapangan: {} ({})", c.getName(), c.getType()));
-    }
-
-    /**
-     * Reset semua lapangan yang tidak TERSEDIA kembali ke TERSEDIA saat startup.
-     * Berguna di development agar semua lapangan selalu bisa dipesan ulang.
-     */
-    private void resetAllLapanganToTersedia() {
-        LocalDateTime now = LocalDateTime.now();
-        lapanganRepository.findAll().forEach(lapangan -> {
-            if (lapangan.getStatus() != LapanganStatus.TERSEDIA) {
-                lapangan.setStatus(LapanganStatus.TERSEDIA);
-                lapangan.setMaintenanceStart(null);
-                lapangan.setMaintenanceEnd(null);
-                lapangan.setUpdatedAt(now);
-                lapanganRepository.save(lapangan);
-                log.info("Reset lapangan ke TERSEDIA: {} ({})", lapangan.getName(), lapangan.getType());
-            }
-        });
     }
 
     /**
