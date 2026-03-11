@@ -33,12 +33,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  * UAT — PBI-BE1 & BE2: WebSocket Broadcast Real-Time
  *
  * Skenario yang dicakup:
- *   BE1-01 · Koneksi WebSocket berhasil terbentuk (CONNECTED)
- *   BE1-02 · Slot berubah ke BOOKED saat booking baru dibuat (tanpa refresh)
- *   BE2-01 · Broadcast diterima klien yang sedang terhubung
- *   BE2-03 · Pesan broadcast memuat semua field wajib
- *   BE2-04 · Error pada satu klien tidak menghambat broadcast ke klien lain
- *   FE3-02 · lastUpdated dalam pesan broadcast tidak null
+ * BE1-01 · Koneksi WebSocket berhasil terbentuk (CONNECTED)
+ * BE1-02 · Slot berubah ke BOOKED saat booking baru dibuat (tanpa refresh)
+ * BE2-01 · Broadcast diterima klien yang sedang terhubung
+ * BE2-03 · Pesan broadcast memuat semua field wajib
+ * BE2-04 · Error pada satu klien tidak menghambat broadcast ke klien lain
+ * FE3-02 · lastUpdated dalam pesan broadcast tidak null
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("h2test")
@@ -46,15 +46,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("BE1 & BE2 · WebSocket Broadcast Integration UAT")
 class BE1_BE2_WebSocketUATTest {
 
-    @LocalServerPort int port;
+    @LocalServerPort
+    int port;
     private final RestTemplate restTemplate = new RestTemplate();
 
     private static final String DATE = "2026-03-09";
 
     private WebSocketStompClient buildStompClient() {
         WebSocketStompClient client = new WebSocketStompClient(
-                new SockJsClient(List.of(new WebSocketTransport(new StandardWebSocketClient())))
-        );
+                new SockJsClient(List.of(new WebSocketTransport(new StandardWebSocketClient()))));
         client.setMessageConverter(new StringMessageConverter());
         return client;
     }
@@ -64,12 +64,16 @@ class BE1_BE2_WebSocketUATTest {
         return restTemplate.postForEntity(
                 "http://localhost:" + port + "/api/test/book",
                 Map.of("courtId", courtId, "date", DATE, "time", time, "customerName", name),
-                Map.class
-        );
+                Map.class);
     }
 
-    @BeforeEach void setUp() {}
-    @AfterEach  void tearDown() {}
+    @BeforeEach
+    void setUp() {
+    }
+
+    @AfterEach
+    void tearDown() {
+    }
 
     // ──────────────────────────────────────────────────────────────────────────
 
@@ -97,15 +101,21 @@ class BE1_BE2_WebSocketUATTest {
     @DisplayName("BE1-02 · Klien menerima pesan saat booking baru dibuat (tanpa reload halaman)")
     void be1_02_clientReceivesMessageWhenBookingCreated() throws Exception {
         CountDownLatch connected = new CountDownLatch(1);
-        CountDownLatch received  = new CountDownLatch(1);
+        CountDownLatch received = new CountDownLatch(1);
         AtomicReference<String> msgRef = new AtomicReference<>();
         WebSocketStompClient client = buildStompClient();
 
         client.connectAsync(wsUrl(), new StompSessionHandlerAdapter() {
-            @Override public void afterConnected(StompSession session, StompHeaders headers) {
+            @Override
+            public void afterConnected(StompSession session, StompHeaders headers) {
                 session.subscribe("/topic/schedule/" + DATE, new StompFrameHandler() {
-                    @Override public Type getPayloadType(StompHeaders h) { return String.class; }
-                    @Override public void handleFrame(StompHeaders h, Object payload) {
+                    @Override
+                    public Type getPayloadType(StompHeaders h) {
+                        return String.class;
+                    }
+
+                    @Override
+                    public void handleFrame(StompHeaders h, Object payload) {
                         msgRef.set((String) payload);
                         received.countDown();
                     }
@@ -138,20 +148,36 @@ class BE1_BE2_WebSocketUATTest {
         WebSocketStompClient client2 = buildStompClient();
 
         client1.connectAsync(wsUrl(), new StompSessionHandlerAdapter() {
-            @Override public void afterConnected(StompSession session, StompHeaders headers) {
+            @Override
+            public void afterConnected(StompSession session, StompHeaders headers) {
                 session.subscribe("/topic/schedule/" + DATE, new StompFrameHandler() {
-                    @Override public Type getPayloadType(StompHeaders h) { return String.class; }
-                    @Override public void handleFrame(StompHeaders h, Object p) { recv1.countDown(); }
+                    @Override
+                    public Type getPayloadType(StompHeaders h) {
+                        return String.class;
+                    }
+
+                    @Override
+                    public void handleFrame(StompHeaders h, Object p) {
+                        recv1.countDown();
+                    }
                 });
                 conn1.countDown();
             }
         });
 
         client2.connectAsync(wsUrl(), new StompSessionHandlerAdapter() {
-            @Override public void afterConnected(StompSession session, StompHeaders headers) {
+            @Override
+            public void afterConnected(StompSession session, StompHeaders headers) {
                 session.subscribe("/topic/schedule/" + DATE, new StompFrameHandler() {
-                    @Override public Type getPayloadType(StompHeaders h) { return String.class; }
-                    @Override public void handleFrame(StompHeaders h, Object p) { recv2.countDown(); }
+                    @Override
+                    public Type getPayloadType(StompHeaders h) {
+                        return String.class;
+                    }
+
+                    @Override
+                    public void handleFrame(StompHeaders h, Object p) {
+                        recv2.countDown();
+                    }
                 });
                 conn2.countDown();
             }
@@ -173,15 +199,21 @@ class BE1_BE2_WebSocketUATTest {
     @DisplayName("BE2-03 · Payload broadcast memuat field: date, courtId, courtName, time, status, lastUpdated")
     void be2_03_broadcastPayloadHasAllRequiredFields() throws Exception {
         CountDownLatch connected = new CountDownLatch(1);
-        CountDownLatch received  = new CountDownLatch(1);
+        CountDownLatch received = new CountDownLatch(1);
         AtomicReference<String> msgRef = new AtomicReference<>();
         WebSocketStompClient client = buildStompClient();
 
         client.connectAsync(wsUrl(), new StompSessionHandlerAdapter() {
-            @Override public void afterConnected(StompSession session, StompHeaders headers) {
+            @Override
+            public void afterConnected(StompSession session, StompHeaders headers) {
                 session.subscribe("/topic/schedule/" + DATE, new StompFrameHandler() {
-                    @Override public Type getPayloadType(StompHeaders h) { return String.class; }
-                    @Override public void handleFrame(StompHeaders h, Object p) {
+                    @Override
+                    public Type getPayloadType(StompHeaders h) {
+                        return String.class;
+                    }
+
+                    @Override
+                    public void handleFrame(StompHeaders h, Object p) {
                         msgRef.set((String) p);
                         received.countDown();
                     }
@@ -212,10 +244,18 @@ class BE1_BE2_WebSocketUATTest {
         WebSocketStompClient goodClient = buildStompClient();
 
         goodClient.connectAsync(wsUrl(), new StompSessionHandlerAdapter() {
-            @Override public void afterConnected(StompSession session, StompHeaders headers) {
+            @Override
+            public void afterConnected(StompSession session, StompHeaders headers) {
                 session.subscribe("/topic/schedule/" + DATE, new StompFrameHandler() {
-                    @Override public Type getPayloadType(StompHeaders h) { return String.class; }
-                    @Override public void handleFrame(StompHeaders h, Object p) { recvGood.countDown(); }
+                    @Override
+                    public Type getPayloadType(StompHeaders h) {
+                        return String.class;
+                    }
+
+                    @Override
+                    public void handleFrame(StompHeaders h, Object p) {
+                        recvGood.countDown();
+                    }
                 });
                 connGood.countDown();
             }
@@ -225,7 +265,8 @@ class BE1_BE2_WebSocketUATTest {
         WebSocketStompClient badClient = buildStompClient();
         CountDownLatch connBad = new CountDownLatch(1);
         badClient.connectAsync(wsUrl(), new StompSessionHandlerAdapter() {
-            @Override public void afterConnected(StompSession session, StompHeaders headers) {
+            @Override
+            public void afterConnected(StompSession session, StompHeaders headers) {
                 session.disconnect();
                 connBad.countDown();
             }
@@ -245,6 +286,6 @@ class BE1_BE2_WebSocketUATTest {
     // ──────────────────────────────────────────────────────────────────────────
 
     private String wsUrl() {
-        return "ws://localhost:" + port + "/ws";
+        return "ws://localhost:" + port + "/api/ws";
     }
 }

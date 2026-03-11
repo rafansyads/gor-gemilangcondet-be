@@ -24,7 +24,7 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
  * });
  * client.onConnect = () => {
  *   client.subscribe('/topic/schedule/2024-12-25', (msg) => {
- *     const update = JSON.parse(msg.body);
+ *     const update = JSON.parse(msg.
  *     // perbarui sel (update.courtId, update.time)
  *   });
  * };

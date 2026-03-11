@@ -9,14 +9,14 @@ import org.springframework.web.client.RestClient;
  * Konfigurasi Spring {@link RestClient} untuk memanggil backend Fadhil
  * (reservasi lapangan).
  *
- * <p>Base URL dikonfigurasi via {@code app.fadhil.base-url} di application.yaml.
+ * <p>Base URL dikonfigurasi via {@code API_BASE_URL} di application.yaml.
  */
 @Configuration
 public class RestClientConfig {
 
     @Bean("fadhilRestClient")
     public RestClient fadhilRestClient(
-            @Value("${app.fadhil.base-url}") String baseUrl) {
+            @Value("${API_BASE_URL:http://localhost:8080}") String baseUrl) {
         return RestClient.builder()
                 .baseUrl(baseUrl)
                 .defaultHeader("Accept", "application/json")
