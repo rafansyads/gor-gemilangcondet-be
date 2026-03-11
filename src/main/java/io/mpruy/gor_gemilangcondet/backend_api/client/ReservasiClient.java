@@ -3,11 +3,13 @@ package io.mpruy.gor_gemilangcondet.backend_api.client;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.fadhil.FadhilBaseResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.fadhil.FadhilCourtAvailabilityDto;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.fadhil.FadhilReservasiDto;
+import io.mpruy.gor_gemilangcondet.backend_api.exception.ExternalServiceException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -18,7 +20,9 @@ import java.util.List;
 /**
  * HTTP client untuk memanggil backend Fadhil (Reservasi lapangan).
  *
- * <p>Digunakan oleh {@link io.mpruy.gor_gemilangcondet.backend_api.service.ScheduleService}
+ * <p>
+ * Digunakan oleh
+ * {@link io.mpruy.gor_gemilangcondet.backend_api.service.ScheduleService}
  * untuk mendapatkan data ketersediaan lapangan dan daftar reservasi aktif dari
  * backend Fadhil sebagai sumber data primer jadwal real-time.
  */
@@ -33,8 +37,10 @@ public class ReservasiClient {
     /**
      * Ambil ketersediaan slot per lapangan untuk tanggal tertentu.
      *
-     * <p>Memanggil {@code GET /bookings/availability?date={date}}.
-     * Setiap entri berisi daftar slot jam-an dengan status {@code available: boolean}.
+     * <p>
+     * Memanggil {@code GET /bookings/availability?date={date}}.
+     * Setiap entri berisi daftar slot jam-an dengan status
+     * {@code available: boolean}.
      *
      * @param date tanggal yang dicek
      * @return daftar ketersediaan per lapangan; list kosong jika gagal
@@ -47,7 +53,8 @@ public class ReservasiClient {
                             .queryParam("date", date.toString())
                             .build())
                     .retrieve()
-                    .body(new ParameterizedTypeReference<>() {});
+                    .body(new ParameterizedTypeReference<>() {
+                    });
 
             if (response == null || response.getData() == null) {
                 log.warn("[FADHIL] getAvailability({}) mengembalikan null", date);
@@ -56,6 +63,9 @@ public class ReservasiClient {
             log.debug("[FADHIL] getAvailability({}) → {} lapangan", date, response.getData().size());
             return response.getData();
 
+        } catch (ResourceAccessException ex) {
+            log.error("[FADHIL] Layanan tidak dapat dijangkau saat getAvailability({}): {}", date, ex.getMessage());
+            throw new ExternalServiceException("Backend Fadhil tidak dapat dijangkau", ex);
         } catch (RestClientException ex) {
             log.error("[FADHIL] Gagal getAvailability({}): {}", date, ex.getMessage());
             return Collections.emptyList();
@@ -66,7 +76,8 @@ public class ReservasiClient {
      * Ambil seluruh reservasi — digunakan untuk lookup {@code namaWakil}
      * yang hanya ditampilkan kepada admin/staf.
      *
-     * <p>Memanggil {@code GET /bookings}.
+     * <p>
+     * Memanggil {@code GET /bookings}.
      *
      * @return daftar semua reservasi; list kosong jika gagal
      */
@@ -75,7 +86,8 @@ public class ReservasiClient {
             FadhilBaseResponse<List<FadhilReservasiDto>> response = restClient.get()
                     .uri("/bookings")
                     .retrieve()
-                    .body(new ParameterizedTypeReference<>() {});
+                    .body(new ParameterizedTypeReference<>() {
+                    });
 
             if (response == null || response.getData() == null) {
                 log.warn("[FADHIL] getAllReservations() mengembalikan null");
@@ -84,6 +96,9 @@ public class ReservasiClient {
             log.debug("[FADHIL] getAllReservations() → {} reservasi", response.getData().size());
             return response.getData();
 
+        } catch (ResourceAccessException ex) {
+            log.error("[FADHIL] Layanan tidak dapat dijangkau saat getAllReservations(): {}", ex.getMessage());
+            throw new ExternalServiceException("Backend Fadhil tidak dapat dijangkau", ex);
         } catch (RestClientException ex) {
             log.error("[FADHIL] Gagal getAllReservations(): {}", ex.getMessage());
             return Collections.emptyList();

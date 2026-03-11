@@ -28,17 +28,19 @@ repositories {
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-data-rest'
+    implementation 'org.springframework.boot:spring-boot-starter-restclient'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
-	implementation 'org.springframework.boot:spring-boot-starter-websocket'
 	implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
-    implementation 'org.springframework.boot:spring-boot-starter-cache'
+	implementation 'org.springframework.boot:spring-boot-starter-cache'
+	implementation 'org.springframework.boot:spring-boot-starter-websocket'
 	implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
     implementation 'com.giffing.bucket4j.spring.boot.starter:bucket4j-spring-boot-starter:0.14.0'
     implementation 'com.github.ben-manes.caffeine:caffeine:3.2.3'
     implementation 'com.github.ben-manes.caffeine:jcache:3.1.8'
     implementation 'javax.cache:cache-api:1.1.1'
+    implementation 'org.springframework.boot:spring-boot-starter-json'
 	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
 	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
 	compileOnly 'org.projectlombok:lombok'
@@ -52,9 +54,11 @@ dependencies {
 	testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
-	testImplementation 'org.springframework.boot:spring-boot-starter-thymeleaf-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-thymeleaf-test'
+	testImplementation 'org.springframework.security:spring-security-test'
+	testImplementation 'org.springframework.boot:spring-boot-test-autoconfigure'
+	testImplementation 'com.fasterxml.jackson.core:jackson-databind'
 	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
-    testImplementation 'org.springframework.security:spring-security-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testRuntimeOnly 'com.h2database:h2'
 }
@@ -65,7 +69,7 @@ tasks.named('test') {
 }
 
 jacoco {
-	toolVersion = "0.8.12"
+	toolVersion = '0.8.12'
 }
 
 jacocoTestReport {
@@ -73,6 +77,21 @@ jacocoTestReport {
 	reports {
 		xml.required = true
 		html.required = true
+		html.outputLocation = layout.buildDirectory.dir('reports/jacoco/html')
+	}
+	afterEvaluate {
+		classDirectories.setFrom(files(classDirectories.files.collect {
+			fileTree(dir: it, excludes: [
+				'**/BackendApiApplication*',
+				'**/config/**',
+				'**/dto/**',
+				'**/entity/**',
+				'**/enums/**',
+				'**/event/**',
+				'**/client/**',
+				'**/security/**',
+			])
+		}))
 	}
 }
 

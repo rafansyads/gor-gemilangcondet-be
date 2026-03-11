@@ -1,6 +1,8 @@
 package io.mpruy.gor_gemilangcondet.backend_api.util;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 
@@ -69,7 +71,9 @@ public class ResponseUtil {
         response.setMessage(message);
         response.setData(data);
         response.setTimestamp(Instant.now());
-        ResponseEntity<BaseResponseDto<T>> entity = new ResponseEntity<>(response, status);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        ResponseEntity<BaseResponseDto<T>> entity = new ResponseEntity<>(response, headers, status);
         return new WithBuilder<>(entity);
     }
 
@@ -85,6 +89,8 @@ public class ResponseUtil {
         response.setMessage(message);
         response.setData(null);
         response.setTimestamp(Instant.now());
-        return new ResponseEntity<>(response, status);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        return new ResponseEntity<>(response, headers, status);
     }
 }

@@ -7,6 +7,10 @@ import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 
+/**
+ * DTO standar untuk seluruh respons REST API.
+ * Membungkus data dengan status HTTP, pesan, dan waktu respons.
+ */
 @AllArgsConstructor
 @NoArgsConstructor
 @Data
