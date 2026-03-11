@@ -1,6 +1,5 @@
 server:
-  port: ${SERVER_PORT:8081} # Gunakan PORT dari environment variable, default 8080
-  forward-headers-strategy: framework
+  port: ${SERVER_PORT:8080}
   servlet:
     context-path: /api
 
