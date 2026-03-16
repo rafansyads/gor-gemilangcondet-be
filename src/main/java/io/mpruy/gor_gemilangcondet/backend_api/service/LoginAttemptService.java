@@ -24,7 +24,8 @@ public class LoginAttemptService {
      */
     public boolean isLocked(String credential) {
         AttemptRecord record = attempts.get(normalize(credential));
-        if (record == null) return false;
+        if (record == null)
+            return false;
         if (record.lockoutUntil != null && LocalDateTime.now().isBefore(record.lockoutUntil)) {
             return true;
         }
@@ -41,7 +42,8 @@ public class LoginAttemptService {
      */
     public LocalDateTime getLockoutUntil(String credential) {
         AttemptRecord record = attempts.get(normalize(credential));
-        if (record == null || record.lockoutUntil == null) return null;
+        if (record == null || record.lockoutUntil == null)
+            return null;
         return LocalDateTime.now().isBefore(record.lockoutUntil) ? record.lockoutUntil : null;
     }
 
@@ -68,7 +70,8 @@ public class LoginAttemptService {
 
     /**
      * Removes all entries whose lockout period has expired.
-     * Called periodically by {@link io.mpruy.gor_gemilangcondet.backend_api.config.AuthScheduler}.
+     * Called periodically by
+     * {@link io.mpruy.gor_gemilangcondet.backend_api.config.AuthScheduler}.
      */
     public void cleanupExpiredLockouts() {
         LocalDateTime now = LocalDateTime.now();
