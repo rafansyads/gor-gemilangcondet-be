@@ -60,7 +60,7 @@ public class ResponseUtil {
 
     /**
      * Build a success response with payload.
-     * 
+     *
      * @param data    domain/DTO payload to return
      * @param message human friendly success message
      * @param status  HTTP status to send (e.g., 200, 201)
@@ -79,7 +79,7 @@ public class ResponseUtil {
 
     /**
      * Build an error response without payload.
-     * 
+     *
      * @param message error details suitable for clients
      * @param status  HTTP error status (e.g., 400, 404, 409, 500)
      */

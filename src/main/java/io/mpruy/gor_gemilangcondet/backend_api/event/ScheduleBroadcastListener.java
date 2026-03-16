@@ -54,7 +54,7 @@ public class ScheduleBroadcastListener {
             return;
         }
 
-        log.info("[SCHEDULE WS] Broadcast → {} | court={} time={} status={}",
-                topic, message.getCourtId(), message.getTime(), message.getStatus());
+        log.info("[SCHEDULE WS] Broadcast → {} | lapangan={} time={} status={}",
+                topic, message.getLapanganId(), message.getTime(), message.getStatus());
     }
 }

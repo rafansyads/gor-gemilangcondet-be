@@ -1,5 +1,6 @@
 package io.mpruy.gor_gemilangcondet.backend_api.config;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -172,6 +173,15 @@ public class DataSeeder implements ApplicationRunner {
                         .status(LapanganStatus.TERSEDIA).tarifPerJam(50000).createdAt(now)
                         .updatedAt(now).build(),
                 Lapangan.builder().name("Badminton 3").type(LapanganType.BADMINTON)
+                        .status(LapanganStatus.TERSEDIA).tarifPerJam(150000).createdAt(now)
+                        .updatedAt(now).build(),
+                Lapangan.builder().name("Badminton 4").type(LapanganType.BADMINTON)
+                        .status(LapanganStatus.TERSEDIA).tarifPerJam(150000).createdAt(now)
+                        .updatedAt(now).build(),
+                Lapangan.builder().name("Badminton 5").type(LapanganType.BADMINTON)
+                        .status(LapanganStatus.TERSEDIA).tarifPerJam(150000).createdAt(now)
+                        .updatedAt(now).build(),
+                Lapangan.builder().name("Badminton 6").type(LapanganType.BADMINTON)
                         .status(LapanganStatus.TERSEDIA).tarifPerJam(150000).createdAt(now)
                         .updatedAt(now).build());
 

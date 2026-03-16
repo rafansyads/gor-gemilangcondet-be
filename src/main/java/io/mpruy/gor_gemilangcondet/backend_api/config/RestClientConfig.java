@@ -16,7 +16,7 @@ public class RestClientConfig {
 
     @Bean("fadhilRestClient")
     public RestClient fadhilRestClient(
-            @Value("${API_BASE_URL:http://localhost:8080}") String baseUrl) {
+            @Value("${API_BASE_URL:http://localhost:8080/api}") String baseUrl) {
         return RestClient.builder()
                 .baseUrl(baseUrl)
                 .defaultHeader("Accept", "application/json")

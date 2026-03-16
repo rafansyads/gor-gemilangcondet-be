@@ -8,13 +8,13 @@ import io.mpruy.gor_gemilangcondet.backend_api.dto.message.ScheduleUpdateMessage
 import io.mpruy.gor_gemilangcondet.backend_api.dto.response.ScheduleResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.response.ScheduleSlotResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.response.ScheduleTimeRowResponse;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.Lapangan;
 import io.mpruy.gor_gemilangcondet.backend_api.entity.Booking;
-import io.mpruy.gor_gemilangcondet.backend_api.entity.Court;
 import io.mpruy.gor_gemilangcondet.backend_api.enums.BookingStatus;
 import io.mpruy.gor_gemilangcondet.backend_api.event.BookingStatusChangedEvent;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.ExternalServiceException;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.BookingRepository;
-import io.mpruy.gor_gemilangcondet.backend_api.repository.CourtRepository;
+import io.mpruy.gor_gemilangcondet.backend_api.repository.LapanganRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.security.JwtRoleExtractor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -61,7 +61,7 @@ public class ScheduleService {
     /** Status booking yang dianggap OCCUPIED (slot tidak tersedia) */
     private static final List<BookingStatus> ACTIVE_STATUSES = List.of(BookingStatus.PENDING, BookingStatus.CONFIRMED);
 
-    private final CourtRepository courtRepository;
+    private final LapanganRepository lapanganRepository;
     private final BookingRepository bookingRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final ReservasiClient reservasiClient;
@@ -86,10 +86,10 @@ public class ScheduleService {
      */
     public ScheduleResponse getSchedule(LocalDate date, boolean showBookerName) {
 
-        List<Court> courts = courtRepository.findAll();
+        List<Lapangan> courts = lapanganRepository.findAll();
         List<Booking> bookings = bookingRepository.findActiveByDate(date, ACTIVE_STATUSES);
 
-        // Buat lookup cepat: (courtId, startTime) → Booking
+        // Buat lookup cepat: (lapanganId, startTime) → Booking
         Map<String, Booking> bookingMap = buildBookingMap(bookings);
 
         List<ScheduleTimeRowResponse> timeRows = new ArrayList<>();
@@ -98,8 +98,8 @@ public class ScheduleService {
             String timeLabel = t.format(TIME_FMT);
             List<ScheduleSlotResponse> slots = new ArrayList<>();
 
-            for (Court court : courts) {
-                String key = slotKey(court.getId(), t);
+            for (Lapangan court : courts) {
+                String key = slotKey(court.getId().toString(), t);
                 Booking found = bookingMap.get(key);
 
                 slots.add(buildSlot(court, found, showBookerName));
@@ -244,8 +244,8 @@ public class ScheduleService {
 
         return ScheduleUpdateMessage.builder()
                 .date(booking.getBookingDate().format(DATE_FMT))
-                .courtId(booking.getCourt().getId())
-                .courtName(booking.getCourt().getName())
+                .lapanganId(booking.getLapangan().getId().toString())
+                .courtName(booking.getLapangan().getName())
                 .time(booking.getStartTime().format(TIME_FMT))
                 .status(occupied ? "BOOKED" : "AVAILABLE")
                 .label(occupied ? bookerName : "Book Now")
@@ -262,21 +262,27 @@ public class ScheduleService {
      *                                  sudah terisi
      */
     @Transactional
-    public Booking createTestBooking(Integer courtId, LocalDate date, LocalTime time, String customerName) {
-        Court court = courtRepository.findById(courtId)
-                .orElseThrow(() -> new IllegalArgumentException("Lapangan tidak ditemukan: " + courtId));
+    public Booking createTestBooking(Integer courtIndex, LocalDate date, LocalTime time, String customerName) {
+        List<Lapangan> allCourts = lapanganRepository.findAll().stream()
+                .sorted(java.util.Comparator.comparing(Lapangan::getName))
+                .toList();
+
+        if (courtIndex < 1 || courtIndex > allCourts.size()) {
+            throw new IllegalArgumentException("Lapangan tidak ditemukan: index " + courtIndex);
+        }
+        Lapangan lapangan = allCourts.get(courtIndex - 1);
 
         // Cek apakah slot sudah terisi
         boolean alreadyBooked = bookingRepository.findActiveByDate(date, ACTIVE_STATUSES)
                 .stream()
-                .anyMatch(b -> b.getCourt().getId().equals(courtId) && b.getStartTime().equals(time));
+                .anyMatch(b -> b.getLapangan().getId().equals(lapangan.getId()) && b.getStartTime().equals(time));
 
         if (alreadyBooked) {
-            throw new IllegalStateException("Slot sudah dipesan untuk lapangan " + courtId + " jam " + time);
+            throw new IllegalStateException("Slot sudah dipesan untuk lapangan " + lapangan.getName() + " jam " + time);
         }
 
         Booking booking = Booking.builder()
-                .court(court)
+                .lapangan(lapangan)
                 .bookingDate(date)
                 .startTime(time)
                 .customerName(customerName)
@@ -308,28 +314,28 @@ public class ScheduleService {
     private Map<String, Booking> buildBookingMap(List<Booking> bookings) {
         Map<String, Booking> map = new HashMap<>();
         for (Booking b : bookings) {
-            map.put(slotKey(b.getCourt().getId(), b.getStartTime()), b);
+            map.put(slotKey(b.getLapangan().getId().toString(), b.getStartTime()), b);
         }
         return map;
     }
 
-    private String slotKey(int courtId, LocalTime time) {
-        return courtId + "_" + time.format(TIME_FMT);
+    private String slotKey(String lapanganId, LocalTime time) {
+        return lapanganId + "_" + time.format(TIME_FMT);
     }
 
-    private ScheduleSlotResponse buildSlot(Court court, Booking booking, boolean showBookerName) {
+    private ScheduleSlotResponse buildSlot(Lapangan lapangan, Booking booking, boolean showBookerName) {
         if (booking == null) {
             return ScheduleSlotResponse.builder()
-                    .courtId(court.getId())
-                    .courtName(court.getName())
+                    .lapanganId(lapangan.getId().toString())
+                    .courtName(lapangan.getName())
                     .status("AVAILABLE")
                     .label("Book Now")
                     .build();
         }
         String bookerName = showBookerName ? booking.getCustomerName() : null;
         return ScheduleSlotResponse.builder()
-                .courtId(court.getId())
-                .courtName(court.getName())
+                .lapanganId(lapangan.getId().toString())
+                .courtName(lapangan.getName())
                 .status("BOOKED")
                 .label(showBookerName ? booking.getCustomerName() : "Booked")
                 .bookerName(bookerName)

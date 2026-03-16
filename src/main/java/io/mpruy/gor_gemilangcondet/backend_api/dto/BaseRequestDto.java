@@ -1,7 +1,10 @@
 package io.mpruy.gor_gemilangcondet.backend_api.dto;
 
 import java.time.Instant;
+
 import com.fasterxml.jackson.annotation.JsonFormat;
+
+import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -17,6 +20,6 @@ public class BaseRequestDto<T> {
     private String message;
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSXXX", timezone = "Asia/Jakarta")
     private Instant timestamp;
+    @Valid
     private T data;
 }
-

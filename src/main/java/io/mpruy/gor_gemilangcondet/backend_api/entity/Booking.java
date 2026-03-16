@@ -1,5 +1,6 @@
 package io.mpruy.gor_gemilangcondet.backend_api.entity;
 
+import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.Lapangan;
 import io.mpruy.gor_gemilangcondet.backend_api.enums.BookingStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -21,10 +22,9 @@ import java.util.UUID;
 @Table(
     name = "bookings",
     uniqueConstraints = {
-        // Satu slot (lapangan + tanggal + jam mulai) hanya boleh dipesan satu kali aktif.
         @UniqueConstraint(
-            name = "uq_booking_court_date_time",
-            columnNames = {"court_id", "booking_date", "start_time"}
+            name = "uq_booking_lapangan_date_time",
+            columnNames = {"lapangan_id", "booking_date", "start_time"}
         )
     }
 )
@@ -41,8 +41,8 @@ public class Booking {
 
     /** Lapangan yang dipesan */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "court_id", nullable = false)
-    private Court court;
+    @JoinColumn(name = "lapangan_id", nullable = false)
+    private Lapangan lapangan;
 
     /** Nama pemesan — ditampilkan di slot "Booked" pada tabel jadwal */
     @Column(name = "customer_name", nullable = false, length = 100)

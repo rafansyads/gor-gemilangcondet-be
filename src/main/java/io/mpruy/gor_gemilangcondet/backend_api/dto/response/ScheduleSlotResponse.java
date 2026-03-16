@@ -36,7 +36,8 @@ import java.util.UUID;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ScheduleSlotResponse {
 
-    private Integer courtId;
+    /** UUID lapangan sebagai string */
+    private String lapanganId;
     private String  courtName;
 
     /** "AVAILABLE" atau "BOOKED" */
@@ -63,10 +64,4 @@ public class ScheduleSlotResponse {
      * Digunakan FE untuk memanggil endpoint cancel.
      */
     private UUID bookingId;
-
-    /**
-     * UUID lapangan dari sistem Fadhil — hanya terisi ketika data berasal dari
-     * backend Fadhil ({@code getScheduleFromFadhil}). Null ketika berasal dari DB lokal.
-     */
-    private String lapanganId;
 }

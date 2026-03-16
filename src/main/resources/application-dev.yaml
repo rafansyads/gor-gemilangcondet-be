@@ -1,9 +1,9 @@
 spring:
   datasource:
     # Gunakan koneksi database di PostgreSQL docker lokal
-    url: "jdbc:postgresql://localhost:35001/gor-gemilangcondet-dev"
-    username: ${DB_USER:gor-gemilangcondet-dev}
-    password: ${DB_PASSWORD:CLI-825.2025X}
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
   
   jpa:
     # "update": Kalau kamu ubah kodingan Entity, tabel database otomatis berubah
@@ -20,10 +20,12 @@ spring:
 # Konfigurasi JWT untuk development (jangan dipakai sama di production!)
 app:
   jwt:
-    secret: ${JWT_SECRET:RahasiaLokalJanganDipakaiDiProduction1234567890}
+    secret: ${JWT_SECRET:dev-secret-key} # Ganti dengan secret yang lebih kuat di production!
     expiration: 86400000 # 24 Jam
 
   upload:
     dir: uploads/payment-proofs
   fadhil:
     base-url: ${FADHIL_BASE_URL:http://localhost:8080/api}
+  cors:
+    allowed-origins: http://localhost:3000,http://localhost:3001

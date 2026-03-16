@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,6 +21,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+@CrossOrigin
 @RestController
 @RequestMapping("/bookings")
 @RequiredArgsConstructor
@@ -31,6 +33,7 @@ public class ReservasiController {
     // GET /bookings — Get all reservations
     // ──────────────────────────────────────────────────────────────────────────
 
+    @PreAuthorize("hasAnyAuthority('GUEST', 'MEMBER', 'ADMIN', 'STAF_LAPANGAN')")
     @GetMapping
     public ResponseEntity<BaseResponseDto<List<ReservasiResponse>>> getAllBookings() {
         List<ReservasiResponse> bookings = reservasiService.getAllReservations();
@@ -42,6 +45,7 @@ public class ReservasiController {
     // GET /bookings/{id} — Get reservation by ID
     // ──────────────────────────────────────────────────────────────────────────
 
+    @PreAuthorize("hasAnyAuthority('GUEST', 'MEMBER', 'ADMIN', 'STAF_LAPANGAN')")
     @GetMapping("/{id}")
     public ResponseEntity<BaseResponseDto<ReservasiResponse>> getBookingById(@PathVariable UUID id) {
         ReservasiResponse booking = reservasiService.getReservationById(id);
@@ -53,6 +57,7 @@ public class ReservasiController {
     // GET /bookings/user/{userId} — Get reservations by user
     // ──────────────────────────────────────────────────────────────────────────
 
+    @PreAuthorize("hasAnyAuthority('GUEST', 'MEMBER', 'ADMIN', 'STAF_LAPANGAN')")
     @GetMapping("/user/{userId}")
     public ResponseEntity<BaseResponseDto<List<ReservasiResponse>>> getBookingsByUserId(
             @PathVariable UUID userId) {
@@ -112,6 +117,7 @@ public class ReservasiController {
      * Creates a new court reservation with anti-conflict (race condition) validation.
      * Automatically calculates total cost based on court hourly rate and equipment rental.
      */
+    @PreAuthorize("hasAnyAuthority('GUEST', 'MEMBER', 'ADMIN', 'STAF_LAPANGAN')")
     @PostMapping("/reserve")
     public ResponseEntity<BaseResponseDto<ReservasiResponse>> createReservation(
             @Validated @RequestBody BaseRequestDto<CreateReservasiRequest> request) {
@@ -128,6 +134,7 @@ public class ReservasiController {
      * Reschedules an existing reservation to a new time slot.
      * Applies the same anti-conflict validation as creation.
      */
+    @PreAuthorize("hasAnyAuthority('GUEST', 'MEMBER', 'ADMIN', 'STAF_LAPANGAN')")
     @PutMapping("/reschedule/{id}")
     public ResponseEntity<BaseResponseDto<ReservasiResponse>> rescheduleReservation(
             @PathVariable UUID id,

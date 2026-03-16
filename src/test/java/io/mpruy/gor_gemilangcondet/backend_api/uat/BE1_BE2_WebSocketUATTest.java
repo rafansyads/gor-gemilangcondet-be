@@ -196,7 +196,7 @@ class BE1_BE2_WebSocketUATTest {
     }
 
     @Test
-    @DisplayName("BE2-03 · Payload broadcast memuat field: date, courtId, courtName, time, status, lastUpdated")
+    @DisplayName("BE2-03 · Payload broadcast memuat field: date, lapanganId, courtName, time, status, lastUpdated")
     void be2_03_broadcastPayloadHasAllRequiredFields() throws Exception {
         CountDownLatch connected = new CountDownLatch(1);
         CountDownLatch received = new CountDownLatch(1);

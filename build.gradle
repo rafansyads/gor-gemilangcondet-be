@@ -63,6 +63,26 @@ dependencies {
 	testRuntimeOnly 'com.h2database:h2'
 }
 
+// Load .env file for bootRun
+def loadEnv = {
+	def envFile = file('.env')
+	def envVars = [:]
+	if (envFile.exists()) {
+		envFile.eachLine { line ->
+			line = line.trim()
+			if (line && !line.startsWith('#') && line.contains('=')) {
+				def idx = line.indexOf('=')
+				envVars[line.substring(0, idx).trim()] = line.substring(idx + 1).trim()
+			}
+		}
+	}
+	return envVars
+}
+
+tasks.named('bootRun') {
+	environment loadEnv()
+}
+
 tasks.named('test') {
 	useJUnitPlatform()
 	finalizedBy jacocoTestReport

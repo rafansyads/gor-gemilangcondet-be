@@ -4,6 +4,7 @@ import io.mpruy.gor_gemilangcondet.backend_api.dto.BaseRequestDto;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.BaseResponseDto;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.users.UserDto;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.users.requests.UpdateProfileRequest;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.users.responses.UpdateProfileResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.service.UserService;
 import io.mpruy.gor_gemilangcondet.backend_api.util.ResponseUtil;
 import lombok.RequiredArgsConstructor;
@@ -66,10 +67,10 @@ public class UserController {
      * @param request wrapped {@link UpdateProfileRequest}
      */
     @PutMapping("/profile")
-    public ResponseEntity<BaseResponseDto<UserDto>> updateProfile(
+    public ResponseEntity<BaseResponseDto<UpdateProfileResponse>> updateProfile(
             @Validated @RequestBody BaseRequestDto<UpdateProfileRequest> request) {
-        UserDto updatedUser = userService.updateProfile(request.getData());
-        return ResponseUtil.success(updatedUser, "Profil berhasil diperbarui", HttpStatus.OK)
+        UpdateProfileResponse result = userService.updateProfile(request.getData());
+        return ResponseUtil.success(result, "Profil berhasil diperbarui", HttpStatus.OK)
                 .toBuilder().build();
     }
 }

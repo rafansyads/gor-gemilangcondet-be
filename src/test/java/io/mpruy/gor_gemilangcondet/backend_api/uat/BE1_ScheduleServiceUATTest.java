@@ -6,11 +6,13 @@ import io.mpruy.gor_gemilangcondet.backend_api.dto.fadhil.FadhilReservasiDto;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.fadhil.FadhilSlotDto;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.response.ScheduleResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.response.ScheduleTimeRowResponse;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.Lapangan;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.LapanganStatus;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.LapanganType;
 import io.mpruy.gor_gemilangcondet.backend_api.entity.Booking;
-import io.mpruy.gor_gemilangcondet.backend_api.entity.Court;
 import io.mpruy.gor_gemilangcondet.backend_api.enums.BookingStatus;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.BookingRepository;
-import io.mpruy.gor_gemilangcondet.backend_api.repository.CourtRepository;
+import io.mpruy.gor_gemilangcondet.backend_api.repository.LapanganRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.security.JwtRoleExtractor;
 import io.mpruy.gor_gemilangcondet.backend_api.service.ScheduleService;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,7 +51,7 @@ import static org.mockito.Mockito.*;
 @DisplayName("BE1 · ScheduleService Unit UAT")
 class BE1_ScheduleServiceUATTest {
 
-    @Mock CourtRepository           courtRepository;
+    @Mock LapanganRepository        lapanganRepository;
     @Mock BookingRepository         bookingRepository;
     @Mock ApplicationEventPublisher eventPublisher;
     @Mock ReservasiClient           reservasiClient;
@@ -59,13 +61,18 @@ class BE1_ScheduleServiceUATTest {
 
     private static final LocalDate TEST_DATE = LocalDate.of(2026, 3, 9);
 
-    private Court court1;
-    private Court court2;
+    private static final UUID COURT1_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private static final UUID COURT2_ID = UUID.fromString("00000000-0000-0000-0000-000000000002");
+
+    private Lapangan court1;
+    private Lapangan court2;
 
     @BeforeEach
     void setUp() {
-        court1 = Court.builder().id(1).name("Lapangan 1").build();
-        court2 = Court.builder().id(2).name("Lapangan 2").build();
+        court1 = Lapangan.builder().id(COURT1_ID).name("Lapangan 1")
+                .type(LapanganType.BADMINTON).status(LapanganStatus.TERSEDIA).tarifPerJam(50000).build();
+        court2 = Lapangan.builder().id(COURT2_ID).name("Lapangan 2")
+                .type(LapanganType.BADMINTON).status(LapanganStatus.TERSEDIA).tarifPerJam(50000).build();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -76,7 +83,7 @@ class BE1_ScheduleServiceUATTest {
         // Arrange: Fadhil returns empty (koneksi gagal)
         when(reservasiClient.getAvailability(TEST_DATE)).thenReturn(Collections.emptyList());
         when(jwtRoleExtractor.canViewBookerName(null)).thenReturn(false);
-        when(courtRepository.findAll()).thenReturn(List.of(court1, court2));
+        when(lapanganRepository.findAll()).thenReturn(List.of(court1, court2));
         when(bookingRepository.findActiveByDate(eq(TEST_DATE), any())).thenReturn(Collections.emptyList());
 
         // Act
@@ -92,7 +99,7 @@ class BE1_ScheduleServiceUATTest {
     @DisplayName("BE1-04 · Grid stabil saat tidak ada transaksi (data tidak berubah sendiri)")
     void be1_04_gridStableWithoutAnyTransaction() {
         // Arrange: dua lapangan, tidak ada booking
-        when(courtRepository.findAll()).thenReturn(List.of(court1, court2));
+        when(lapanganRepository.findAll()).thenReturn(List.of(court1, court2));
         when(bookingRepository.findActiveByDate(eq(TEST_DATE), any())).thenReturn(Collections.emptyList());
 
         // Act: panggil getSchedule dua kali, hasilnya harus identik
@@ -113,7 +120,7 @@ class BE1_ScheduleServiceUATTest {
     @DisplayName("FE1-01 · Grid dimulai pukul 07:00 dan berakhir 22:00 (16 baris waktu)")
     void fe1_01_gridHasSixteenTimeRowsFrom7To22() {
         // Arrange
-        when(courtRepository.findAll()).thenReturn(List.of(court1));
+        when(lapanganRepository.findAll()).thenReturn(List.of(court1));
         when(bookingRepository.findActiveByDate(eq(TEST_DATE), any())).thenReturn(Collections.emptyList());
 
         // Act
@@ -129,15 +136,15 @@ class BE1_ScheduleServiceUATTest {
     @DisplayName("FE1-01 · Jumlah kolom per baris sesuai jumlah court")
     void fe1_01_eachTimeRowHasSlotCountMatchingCourts() {
         // Arrange: 6 lapangan
-        List<Court> sixCourts = List.of(
-                Court.builder().id(1).name("L1").build(),
-                Court.builder().id(2).name("L2").build(),
-                Court.builder().id(3).name("L3").build(),
-                Court.builder().id(4).name("L4").build(),
-                Court.builder().id(5).name("L5").build(),
-                Court.builder().id(6).name("L6").build()
+        List<Lapangan> sixCourts = List.of(
+                Lapangan.builder().id(UUID.randomUUID()).name("L1").type(LapanganType.BADMINTON).status(LapanganStatus.TERSEDIA).tarifPerJam(50000).build(),
+                Lapangan.builder().id(UUID.randomUUID()).name("L2").type(LapanganType.BADMINTON).status(LapanganStatus.TERSEDIA).tarifPerJam(50000).build(),
+                Lapangan.builder().id(UUID.randomUUID()).name("L3").type(LapanganType.BADMINTON).status(LapanganStatus.TERSEDIA).tarifPerJam(50000).build(),
+                Lapangan.builder().id(UUID.randomUUID()).name("L4").type(LapanganType.BADMINTON).status(LapanganStatus.TERSEDIA).tarifPerJam(50000).build(),
+                Lapangan.builder().id(UUID.randomUUID()).name("L5").type(LapanganType.BADMINTON).status(LapanganStatus.TERSEDIA).tarifPerJam(50000).build(),
+                Lapangan.builder().id(UUID.randomUUID()).name("L6").type(LapanganType.BADMINTON).status(LapanganStatus.TERSEDIA).tarifPerJam(50000).build()
         );
-        when(courtRepository.findAll()).thenReturn(sixCourts);
+        when(lapanganRepository.findAll()).thenReturn(sixCourts);
         when(bookingRepository.findActiveByDate(eq(TEST_DATE), any())).thenReturn(Collections.emptyList());
 
         // Act
@@ -156,7 +163,7 @@ class BE1_ScheduleServiceUATTest {
         // Arrange: slot jam 10:00 di lapangan 1 sudah dipesan oleh "Budi"
         Booking booking = Booking.builder()
                 .id(UUID.randomUUID())
-                .court(court1)
+                .lapangan(court1)
                 .bookingDate(TEST_DATE)
                 .startTime(LocalTime.of(10, 0))
                 .customerName("Budi")
@@ -165,7 +172,7 @@ class BE1_ScheduleServiceUATTest {
 
         when(reservasiClient.getAvailability(TEST_DATE)).thenReturn(Collections.emptyList()); // fallback
         when(jwtRoleExtractor.canViewBookerName("ADMIN")).thenReturn(true); // admin bisa lihat bookerName
-        when(courtRepository.findAll()).thenReturn(List.of(court1));
+        when(lapanganRepository.findAll()).thenReturn(List.of(court1));
         when(bookingRepository.findActiveByDate(eq(TEST_DATE), any())).thenReturn(List.of(booking));
 
         // Act
@@ -188,7 +195,7 @@ class BE1_ScheduleServiceUATTest {
         // Arrange: slot jam 10:00 sudah dipesan namun JWT tidak ada
         Booking booking = Booking.builder()
                 .id(UUID.randomUUID())
-                .court(court1)
+                .lapangan(court1)
                 .bookingDate(TEST_DATE)
                 .startTime(LocalTime.of(10, 0))
                 .customerName("Rani")
@@ -197,7 +204,7 @@ class BE1_ScheduleServiceUATTest {
 
         when(reservasiClient.getAvailability(TEST_DATE)).thenReturn(Collections.emptyList()); // fallback
         when(jwtRoleExtractor.canViewBookerName(null)).thenReturn(false);
-        when(courtRepository.findAll()).thenReturn(List.of(court1));
+        when(lapanganRepository.findAll()).thenReturn(List.of(court1));
         when(bookingRepository.findActiveByDate(eq(TEST_DATE), any())).thenReturn(List.of(booking));
 
         // Act
@@ -216,7 +223,7 @@ class BE1_ScheduleServiceUATTest {
     @DisplayName("FE2-02 · Slot tersedia memiliki status AVAILABLE dan label yang sesuai")
     void fe2_02_availableSlotHasCorrectStatus() {
         // Arrange: tidak ada booking
-        when(courtRepository.findAll()).thenReturn(List.of(court1));
+        when(lapanganRepository.findAll()).thenReturn(List.of(court1));
         when(bookingRepository.findActiveByDate(eq(TEST_DATE), any())).thenReturn(Collections.emptyList());
 
         // Act
@@ -241,7 +248,7 @@ class BE1_ScheduleServiceUATTest {
         // Arrange
         Booking booking = Booking.builder()
                 .id(UUID.randomUUID())
-                .court(court1)
+                .lapangan(court1)
                 .bookingDate(TEST_DATE)
                 .startTime(LocalTime.of(14, 0))
                 .customerName("Ahmad")
@@ -253,7 +260,7 @@ class BE1_ScheduleServiceUATTest {
 
         // Assert: semua field wajib ada
         assertThat(msg.getDate()).isEqualTo("2026-03-09");
-        assertThat(msg.getCourtId()).isEqualTo(1);
+        assertThat(msg.getLapanganId()).isEqualTo(COURT1_ID.toString());
         assertThat(msg.getCourtName()).isEqualTo("Lapangan 1");
         assertThat(msg.getTime()).isEqualTo("14:00");
         assertThat(msg.getStatus()).isEqualTo("BOOKED");
