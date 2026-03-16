@@ -145,7 +145,7 @@ class ReservasiControllerTest {
         createReq.setDurationInHours(2);
         createReq.setUserId(UUID.randomUUID());
         createReq.setNamaWakil("John");
-        createReq.setNomorTelepon("08123");
+        createReq.setNomorTelepon("081234567");
         createReq.setJumlahOrang(4);
         BaseRequestDto<CreateReservasiRequest> request = new BaseRequestDto<>();
         request.setData(createReq);
