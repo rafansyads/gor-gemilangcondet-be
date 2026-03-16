@@ -100,12 +100,17 @@ public class PembayaranController {
         }
 
         String contentType = "image/jpeg";
-        if (filename.endsWith(".png"))
+        String lowerFilename = filename.toLowerCase();
+        if (lowerFilename.endsWith(".png"))
             contentType = "image/png";
-        else if (filename.endsWith(".gif"))
-            contentType = "image/gif";
-        else if (filename.endsWith(".webp"))
+        else if (lowerFilename.endsWith(".webp"))
             contentType = "image/webp";
+        else if (lowerFilename.endsWith(".heic"))
+            contentType = "image/heic";
+        else if (lowerFilename.endsWith(".heif"))
+            contentType = "image/heif";
+        else if (lowerFilename.endsWith(".bmp"))
+            contentType = "image/bmp";
 
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(contentType))

@@ -1,12 +1,5 @@
 package io.mpruy.gor_gemilangcondet.backend_api.security.service;
 
-import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.requests.LoginRequest;
-import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.requests.RefreshTokenRequest;
-import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.responses.AuthResponse;
-import io.mpruy.gor_gemilangcondet.backend_api.security.UserDetailsImpl;
-import io.mpruy.gor_gemilangcondet.backend_api.security.jwt.JwtUtils;
-import io.mpruy.gor_gemilangcondet.backend_api.service.mapper.AuthMapper;
-import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -15,6 +8,14 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Service;
+
+import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.requests.LoginRequest;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.requests.RefreshTokenRequest;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.responses.AuthResponse;
+import io.mpruy.gor_gemilangcondet.backend_api.security.UserDetailsImpl;
+import io.mpruy.gor_gemilangcondet.backend_api.security.jwt.JwtUtils;
+import io.mpruy.gor_gemilangcondet.backend_api.service.mapper.AuthMapper;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -38,7 +39,7 @@ public class JwtTokenService {
     public AuthResponse login(LoginRequest request) {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
-                        request.getUsername(), request.getPassword()));
+                        request.getUsernameOrEmail(), request.getPassword()));
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();

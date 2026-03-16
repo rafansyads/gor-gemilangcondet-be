@@ -1,10 +1,12 @@
 package io.mpruy.gor_gemilangcondet.backend_api.service;
 
+import java.time.LocalDateTime;
 import java.util.Set;
 
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -22,6 +24,7 @@ import io.mpruy.gor_gemilangcondet.backend_api.entities.users.RoleName;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.User;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.BadRequestException;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.ConflictException;
+import io.mpruy.gor_gemilangcondet.backend_api.exception.TooManyRequestException;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.UnauthorizedException;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.RoleRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.UserRepository;
@@ -47,6 +50,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final LoginAttemptService loginAttemptService;
 
     /**
      * Roles that only privileged actors (admin portal) may assign during
@@ -70,10 +74,24 @@ public class AuthService {
      * @return {@link AuthResponse} carrying both tokens and the redirect URL
      */
     public AuthResponse login(LoginRequest request, String redirectUrl) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.getUsername(), request.getPassword()));
+        String credential = request.getUsernameOrEmail();
 
+        if (loginAttemptService.isLocked(credential)) {
+            LocalDateTime lockoutUntil = loginAttemptService.getLockoutUntil(credential);
+            throw new TooManyRequestException(
+                    "Terlalu banyak percobaan login yang gagal. Silakan coba lagi pada " + lockoutUntil);
+        }
+
+        Authentication authentication;
+        try {
+            authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(credential, request.getPassword()));
+        } catch (AuthenticationException ex) {
+            loginAttemptService.recordFailedAttempt(credential);
+            throw ex;
+        }
+
+        loginAttemptService.resetAttempts(credential);
         SecurityContextHolder.getContext().setAuthentication(authentication);
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
 

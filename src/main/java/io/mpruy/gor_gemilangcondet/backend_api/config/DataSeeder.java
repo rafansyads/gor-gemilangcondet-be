@@ -3,6 +3,7 @@ package io.mpruy.gor_gemilangcondet.backend_api.config;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -17,9 +18,8 @@ import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.AlatOlahragaStatu
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.BarangType;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.Role;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.RoleName;
-import io.mpruy.gor_gemilangcondet.backend_api.entity.Court;
+import io.mpruy.gor_gemilangcondet.backend_api.repository.LapanganRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.AlatOlahragaRepository;
-import io.mpruy.gor_gemilangcondet.backend_api.repository.CourtRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.LapanganRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.RoleRepository;
 import lombok.RequiredArgsConstructor;
@@ -40,7 +40,6 @@ public class DataSeeder implements ApplicationRunner {
     private final RoleRepository roleRepository;
     private final LapanganRepository lapanganRepository;
     private final AlatOlahragaRepository alatOlahragaRepository;
-    private final CourtRepository courtRepository;
 
     @Override
     @Transactional
@@ -83,14 +82,20 @@ public class DataSeeder implements ApplicationRunner {
      */
     private void seedCourts() {
         for (int i = 1; i <= 6; i++) {
-            final int id = i;
-            if (courtRepository.findById(id).isEmpty()) {
-                Court court = Court.builder()
+            final UUID id = UUID.fromString("00000000-0000-0000-0000-00000000000" + i);
+            if (lapanganRepository.findById(id).isEmpty()) {
+                LocalDateTime now = LocalDateTime.now();
+                Lapangan court = Lapangan.builder()
                         .id(id)
-                        .name("Court " + id)
+                        .name("Court " + i)
+                        .type(LapanganType.BADMINTON)
+                        .status(LapanganStatus.TERSEDIA)
+                        .tarifPerJam(50000)
+                        .createdAt(now)
+                        .updatedAt(now)
                         .build();
-                courtRepository.save(court);
-                log.info("Seeded court: {} (id={})", court.getName(), court.getId());
+                lapanganRepository.save(court);
+                log.info("Seeded court: {} ({})", court.getName(), court.getType());
             }
         }
     }
