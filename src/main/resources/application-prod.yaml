@@ -17,3 +17,8 @@ app:
   jwt:
     secret: ${JWT_SECRET}
     expiration: 3600000 # 1 Jam (Lebih aman expired cepat)
+
+  fadhil:
+    base-url: ${FADHIL_BASE_URL:http://localhost:8080/api}
+  cors:
+    allowed-origins: ${ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001}
