@@ -1,6 +1,5 @@
 package io.mpruy.gor_gemilangcondet.backend_api.config;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -20,7 +19,6 @@ import io.mpruy.gor_gemilangcondet.backend_api.entities.users.Role;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.RoleName;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.LapanganRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.AlatOlahragaRepository;
-import io.mpruy.gor_gemilangcondet.backend_api.repository.LapanganRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.RoleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -82,12 +80,11 @@ public class DataSeeder implements ApplicationRunner {
      */
     private void seedCourts() {
         for (int i = 1; i <= 6; i++) {
-            final UUID id = UUID.fromString("00000000-0000-0000-0000-00000000000" + i);
-            if (lapanganRepository.findById(id).isEmpty()) {
+            String name = "Court " + i;
+            if (lapanganRepository.findByName(name).isEmpty()) {
                 LocalDateTime now = LocalDateTime.now();
                 Lapangan court = Lapangan.builder()
-                        .id(id)
-                        .name("Court " + i)
+                        .name(name)
                         .type(LapanganType.BADMINTON)
                         .status(LapanganStatus.TERSEDIA)
                         .tarifPerJam(50000)
