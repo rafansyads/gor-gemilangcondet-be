@@ -1,6 +1,6 @@
 # Sistem Informasi GOR Gemilang Condet Backend API
 
-## Java Springboot Directory Structure
+Pembagian PBI Backlog: 
 
 This repository will also contains the Springboot directory in `src/main/java/io/mpruy/gor_gemilangcondet/backend_api`.  Below is the directory structure:
 
@@ -36,6 +36,13 @@ test/
 - **config/security/exception**: App configuration, security rules, and error handling.
 - **resources**: App properties, static assets, and templates.
 - **tests**: Unit and integration tests.
+
+## Task Owners (to be added and adapted later on)
+
+- Rafansya Daryltama Santoso (2306211231): `login`, `registrasi`, `logout`, `transaksi kantin dan toko`, `manajemen membership`
+Task Owners (to be added and adapted later on)
+
+A. Sherwyn Fawwaz Nitisara S. (2306165811) : `Penjadwalan Ulang (Reschedule)`, `Update Informasi & Tarif Lapangan`, `Tambah Produk Kantin/Toko`, `Riwayat Kartu Stok (Stock Card)`, `Laporan Kasir Harian`, `Rekapitulasi Sewa`
 
 ## Getting Started
 

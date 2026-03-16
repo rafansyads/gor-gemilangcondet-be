@@ -1,0 +1,9 @@
+services:
+  gor-gemilangcondet-db:
+    image: postgres:17.5-alpine
+    volumes:
+      - gor-gemilangcondet-db:/var/lib/postgresql/data
+
+volumes:
+  gor-gemilangcondet-db:
+    driver: local
