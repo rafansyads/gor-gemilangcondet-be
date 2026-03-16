@@ -451,10 +451,10 @@ class PembayaranServiceTest {
             setUpStaffAuth();
             testReservasi.setStatus(ReservasiStatus.MENUNGGU_KONFIRMASI_STAF);
 
-            when(reservasiRepository.findByIdWithLapangan(reservasiId))
+            lenient().when(reservasiRepository.findByIdWithLapangan(reservasiId))
                     .thenReturn(Optional.of(testReservasi));
-            when(reservasiRepository.save(any(Reservasi.class))).thenAnswer(i -> i.getArgument(0));
-            when(lapanganRepository.save(any(Lapangan.class))).thenAnswer(i -> i.getArgument(0));
+            lenient().when(reservasiRepository.save(any(Reservasi.class))).thenAnswer(i -> i.getArgument(0));
+            lenient().when(lapanganRepository.save(any(Lapangan.class))).thenAnswer(i -> i.getArgument(0));
 
             ConfirmPaymentResponse result = pembayaranService.rejectPayment(reservasiId);
 
