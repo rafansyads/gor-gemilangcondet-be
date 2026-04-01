@@ -16,10 +16,11 @@ public class UserDetailsServiceImpl implements UserDetailsService {
 
     @Override
     @Transactional(readOnly = true)
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        return userRepository.findByUsername(username)
+    public UserDetails loadUserByUsername(String usernameOrEmail) throws UsernameNotFoundException {
+        return userRepository.findByUsername(usernameOrEmail)
+                .or(() -> userRepository.findByEmail(usernameOrEmail))
                 .map(UserDetailsImpl::new)
                 .orElseThrow(() -> new UsernameNotFoundException(
-                        "Pengguna tidak ditemukan dengan username: " + username));
+                        "Pengguna tidak ditemukan: " + usernameOrEmail));
     }
 }

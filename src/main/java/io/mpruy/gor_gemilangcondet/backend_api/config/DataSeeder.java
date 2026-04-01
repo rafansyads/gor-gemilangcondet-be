@@ -1,8 +1,8 @@
 package io.mpruy.gor_gemilangcondet.backend_api.config;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -17,8 +17,8 @@ import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.AlatOlahragaStatu
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.BarangType;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.Role;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.RoleName;
-import io.mpruy.gor_gemilangcondet.backend_api.repository.AlatOlahragaRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.LapanganRepository;
+import io.mpruy.gor_gemilangcondet.backend_api.repository.AlatOlahragaRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.RoleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +43,7 @@ public class DataSeeder implements ApplicationRunner {
     @Transactional
     public void run(ApplicationArguments args) {
         seedRoles();
+        seedCourts();
         seedLapangan(); // nantinya tergantung GOR
         seedAlatOlahraga(); // nantinya tergantung GOR, bisa jadi tidak ada alat olahraga yang disewakan
         resetAllLapanganToTersedia();
@@ -63,6 +64,35 @@ public class DataSeeder implements ApplicationRunner {
             if (roleRepository.findByRoleName(roleName).isEmpty()) {
                 roleRepository.save(Role.builder().roleName(roleName).build());
                 log.info("Seeded role: {}", roleName);
+            }
+        }
+    }
+
+    /**
+     * Menyiapkan 6 lapangan (court) yang merepresentasikan lapangan badminton
+     * di GOR Gemilang Condet (id 1–6, nama "Court 1" s/d "Court 6").
+     *
+     * <p>
+     * Metode ini idempotent — jika data sudah ada, tidak akan membuat duplikasi.
+     *
+     * @see Court
+     * @see CourtRepository
+     */
+    private void seedCourts() {
+        for (int i = 1; i <= 6; i++) {
+            String name = "Court " + i;
+            if (lapanganRepository.findByName(name).isEmpty()) {
+                LocalDateTime now = LocalDateTime.now();
+                Lapangan court = Lapangan.builder()
+                        .name(name)
+                        .type(LapanganType.BADMINTON)
+                        .status(LapanganStatus.TERSEDIA)
+                        .tarifPerJam(50000)
+                        .createdAt(now)
+                        .updatedAt(now)
+                        .build();
+                lapanganRepository.save(court);
+                log.info("Seeded court: {} ({})", court.getName(), court.getType());
             }
         }
     }
