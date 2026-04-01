@@ -50,11 +50,32 @@ class UserDetailsServiceImplTest {
     }
 
     @Test
-    @DisplayName("Should throw when username not found")
+    @DisplayName("Should throw when neither username nor email found")
     void loadUserByUsername_NotFound() {
         when(userRepository.findByUsername("unknown")).thenReturn(Optional.empty());
+        when(userRepository.findByEmail("unknown")).thenReturn(Optional.empty());
 
         assertThrows(UsernameNotFoundException.class,
                 () -> userDetailsServiceImpl.loadUserByUsername("unknown"));
+    }
+
+    @Test
+    @DisplayName("Should load user by email when username lookup misses")
+    void loadUserByEmail_Success() {
+        Role role = new Role();
+        role.setId(1);
+        role.setRoleName(RoleName.MEMBER);
+        User user = User.builder()
+                .id(UUID.randomUUID()).username("testuser")
+                .email("test@test.com").password("hashed").role(role)
+                .build();
+
+        when(userRepository.findByUsername("test@test.com")).thenReturn(Optional.empty());
+        when(userRepository.findByEmail("test@test.com")).thenReturn(Optional.of(user));
+
+        UserDetails result = userDetailsServiceImpl.loadUserByUsername("test@test.com");
+
+        assertNotNull(result);
+        assertEquals("testuser", result.getUsername());
     }
 }

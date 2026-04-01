@@ -286,6 +286,56 @@ class PembayaranServiceTest {
             assertNotNull(result);
             assertEquals(ReservasiStatus.MENUNGGU_KONFIRMASI_STAF, result.getStatus());
         }
+
+        @Test
+        @DisplayName("Should reject file with unsupported extension")
+        void uploadProof_UnsupportedExtension() {
+            MultipartFile file = mock(MultipartFile.class);
+            when(file.isEmpty()).thenReturn(false);
+            when(file.getOriginalFilename()).thenReturn("document.pdf");
+
+            when(reservasiRepository.findByIdWithLapangan(reservasiId))
+                    .thenReturn(Optional.of(testReservasi));
+
+            assertThrows(BadRequestException.class,
+                    () -> pembayaranService.uploadPaymentProof(reservasiId, file));
+        }
+
+        @Test
+        @DisplayName("Should reject file with mismatched content type")
+        void uploadProof_UnsupportedContentType() {
+            MultipartFile file = mock(MultipartFile.class);
+            when(file.isEmpty()).thenReturn(false);
+            when(file.getOriginalFilename()).thenReturn("photo.jpg");
+            when(file.getContentType()).thenReturn("application/pdf");
+
+            when(reservasiRepository.findByIdWithLapangan(reservasiId))
+                    .thenReturn(Optional.of(testReservasi));
+
+            assertThrows(BadRequestException.class,
+                    () -> pembayaranService.uploadPaymentProof(reservasiId, file));
+        }
+
+        @Test
+        @DisplayName("Should accept HEIC photo format")
+        void uploadProof_HeicFormatAccepted() throws IOException {
+            ReflectionTestUtils.setField(pembayaranService, "uploadDir", "build/test-uploads/payment-proofs");
+
+            MultipartFile file = mock(MultipartFile.class);
+            when(file.isEmpty()).thenReturn(false);
+            when(file.getOriginalFilename()).thenReturn("photo.heic");
+            when(file.getContentType()).thenReturn("image/heic");
+            when(file.getInputStream()).thenReturn(new ByteArrayInputStream("fake image".getBytes()));
+
+            when(reservasiRepository.findByIdWithLapangan(reservasiId))
+                    .thenReturn(Optional.of(testReservasi));
+            when(reservasiRepository.save(any(Reservasi.class))).thenAnswer(i -> i.getArgument(0));
+
+            ReservasiResponse result = pembayaranService.uploadPaymentProof(reservasiId, file);
+
+            assertNotNull(result);
+            assertEquals(ReservasiStatus.MENUNGGU_KONFIRMASI_STAF, result.getStatus());
+        }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -401,10 +451,10 @@ class PembayaranServiceTest {
             setUpStaffAuth();
             testReservasi.setStatus(ReservasiStatus.MENUNGGU_KONFIRMASI_STAF);
 
-            when(reservasiRepository.findByIdWithLapangan(reservasiId))
+            lenient().when(reservasiRepository.findByIdWithLapangan(reservasiId))
                     .thenReturn(Optional.of(testReservasi));
-            when(reservasiRepository.save(any(Reservasi.class))).thenAnswer(i -> i.getArgument(0));
-            when(lapanganRepository.save(any(Lapangan.class))).thenAnswer(i -> i.getArgument(0));
+            lenient().when(reservasiRepository.save(any(Reservasi.class))).thenAnswer(i -> i.getArgument(0));
+            lenient().when(lapanganRepository.save(any(Lapangan.class))).thenAnswer(i -> i.getArgument(0));
 
             ConfirmPaymentResponse result = pembayaranService.rejectPayment(reservasiId);
 

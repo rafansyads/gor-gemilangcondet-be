@@ -2,6 +2,7 @@ package io.mpruy.gor_gemilangcondet.backend_api.service;
 
 import io.mpruy.gor_gemilangcondet.backend_api.dto.users.UserDto;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.users.requests.UpdateProfileRequest;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.users.responses.UpdateProfileResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.Role;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.RoleName;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.User;
@@ -9,6 +10,8 @@ import io.mpruy.gor_gemilangcondet.backend_api.exception.ConflictException;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.ResourceNotFoundException;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.UserRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.security.UserDetailsImpl;
+import io.mpruy.gor_gemilangcondet.backend_api.security.jwt.JwtUtils;
+import io.mpruy.gor_gemilangcondet.backend_api.security.service.RefreshTokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -34,6 +37,12 @@ class UserServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private JwtUtils jwtUtils;
+
+    @Mock
+    private RefreshTokenService refreshTokenService;
 
     @InjectMocks
     private UserService userService;
@@ -177,10 +186,11 @@ class UserServiceTest {
             when(userRepository.existsByEmailAndIdNot("updated@example.com", userId)).thenReturn(false);
             when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
 
-            UserDto result = userService.updateProfile(request);
+            UpdateProfileResponse response = userService.updateProfile(request);
+            UserDto updatedUser = response.getUser();
 
-            assertEquals("updateduser", result.getUsername());
-            assertEquals("updated@example.com", result.getEmail());
+            assertEquals("updateduser", updatedUser.getUsername());
+            assertEquals("updated@example.com", updatedUser.getEmail());
         }
 
         @Test

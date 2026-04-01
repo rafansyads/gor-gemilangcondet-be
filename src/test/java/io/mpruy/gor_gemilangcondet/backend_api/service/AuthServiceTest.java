@@ -10,6 +10,7 @@ import io.mpruy.gor_gemilangcondet.backend_api.entities.users.RoleName;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.User;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.BadRequestException;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.ConflictException;
+import io.mpruy.gor_gemilangcondet.backend_api.exception.TooManyRequestException;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.UnauthorizedException;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.RoleRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.UserRepository;
@@ -35,6 +36,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -66,6 +68,8 @@ class AuthServiceTest {
     private RoleRepository roleRepository;
     @Mock
     private PasswordEncoder passwordEncoder;
+    @Mock
+    private LoginAttemptService loginAttemptService;
 
     @InjectMocks
     private AuthService authService;
@@ -99,7 +103,7 @@ class AuthServiceTest {
         @DisplayName("Should login successfully with valid credentials")
         void login_Success() {
             LoginRequest request = new LoginRequest();
-            request.setUsername("testuser");
+            request.setUsernameOrEmail("testuser");
             request.setPassword("Password1");
 
             Authentication auth = mock(Authentication.class);
@@ -129,7 +133,7 @@ class AuthServiceTest {
         @DisplayName("Should login successfully without redirect URL")
         void login_SuccessWithoutRedirectUrl() {
             LoginRequest request = new LoginRequest();
-            request.setUsername("testuser");
+            request.setUsernameOrEmail("testuser");
             request.setPassword("Password1");
 
             Authentication auth = mock(Authentication.class);
@@ -152,7 +156,7 @@ class AuthServiceTest {
         @DisplayName("Should throw exception for invalid credentials")
         void login_InvalidCredentials() {
             LoginRequest request = new LoginRequest();
-            request.setUsername("testuser");
+            request.setUsernameOrEmail("testuser");
             request.setPassword("wrong");
 
             when(authenticationManager.authenticate(any()))
@@ -180,7 +184,7 @@ class AuthServiceTest {
             UserDetailsImpl adminDetails = new UserDetailsImpl(adminUser);
 
             LoginRequest request = new LoginRequest();
-            request.setUsername("admin1");
+            request.setUsernameOrEmail("admin1");
             request.setPassword("Password1");
 
             Authentication auth = mock(Authentication.class);
@@ -209,7 +213,7 @@ class AuthServiceTest {
             UserDetailsImpl stafDetails = new UserDetailsImpl(stafUser);
 
             LoginRequest request = new LoginRequest();
-            request.setUsername("staf1");
+            request.setUsernameOrEmail("staf1");
             request.setPassword("Password1");
 
             Authentication auth = mock(Authentication.class);
@@ -232,7 +236,7 @@ class AuthServiceTest {
         @DisplayName("Should reject login admin for GUEST role")
         void loginAdmin_RejectGuestRole() {
             LoginRequest request = new LoginRequest();
-            request.setUsername("testuser");
+            request.setUsernameOrEmail("testuser");
             request.setPassword("Password1");
 
             Authentication auth = mock(Authentication.class);
@@ -258,7 +262,7 @@ class AuthServiceTest {
             UserDetailsImpl memberDetails = new UserDetailsImpl(memberUser);
 
             LoginRequest request = new LoginRequest();
-            request.setUsername("member1");
+            request.setUsernameOrEmail("member1");
             request.setPassword("Password1");
 
             Authentication auth = mock(Authentication.class);
@@ -583,6 +587,87 @@ class AuthServiceTest {
         void logout_NonBearerHeader() {
             authService.logout("Basic abc123");
             verify(jwtTokenBlacklist, never()).blacklistToken(anyString());
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // LOGIN ATTEMPT RATE LIMITING
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Nested
+    @DisplayName("Login Attempt Rate Limiting Tests")
+    class LoginAttemptTests {
+
+        @Test
+        @DisplayName("Should throw TooManyRequestException when credential is locked out")
+        void login_Locked_ThrowsTooManyRequestException() {
+            LoginRequest request = new LoginRequest();
+            request.setUsernameOrEmail("testuser");
+            request.setPassword("Password1");
+
+            when(loginAttemptService.isLocked("testuser")).thenReturn(true);
+            when(loginAttemptService.getLockoutUntil("testuser"))
+                    .thenReturn(LocalDateTime.now().plusMinutes(1));
+
+            assertThrows(TooManyRequestException.class, () -> authService.login(request, null));
+            verify(authenticationManager, never()).authenticate(any());
+        }
+
+        @Test
+        @DisplayName("Should record failed attempt on bad credentials")
+        void login_BadCredentials_RecordsFailedAttempt() {
+            LoginRequest request = new LoginRequest();
+            request.setUsernameOrEmail("testuser");
+            request.setPassword("wrong");
+
+            when(authenticationManager.authenticate(any()))
+                    .thenThrow(new BadCredentialsException("Bad credentials"));
+
+            assertThrows(BadCredentialsException.class, () -> authService.login(request, null));
+            verify(loginAttemptService).recordFailedAttempt("testuser");
+            verify(loginAttemptService, never()).resetAttempts(anyString());
+        }
+
+        @Test
+        @DisplayName("Should reset attempts on successful login")
+        void login_Success_ResetsAttempts() {
+            LoginRequest request = new LoginRequest();
+            request.setUsernameOrEmail("testuser");
+            request.setPassword("Password1");
+
+            Authentication auth = mock(Authentication.class);
+            when(auth.getPrincipal()).thenReturn(userDetails);
+            when(authenticationManager.authenticate(any())).thenReturn(auth);
+            when(jwtUtils.generateAccessToken(userDetails)).thenReturn("token");
+            when(refreshTokenService.createRefreshToken("testuser")).thenReturn("refresh");
+            when(authMapper.toAuthResponse("token", "refresh", userDetails))
+                    .thenReturn(AuthResponse.builder().accessToken("token").build());
+
+            authService.login(request, null);
+
+            verify(loginAttemptService).resetAttempts("testuser");
+            verify(loginAttemptService, never()).recordFailedAttempt(anyString());
+        }
+
+        @Test
+        @DisplayName("Should login successfully using an email address")
+        void login_WithEmail_Success() {
+            LoginRequest request = new LoginRequest();
+            request.setUsernameOrEmail("test@example.com");
+            request.setPassword("Password1");
+
+            Authentication auth = mock(Authentication.class);
+            when(auth.getPrincipal()).thenReturn(userDetails);
+            when(authenticationManager.authenticate(any())).thenReturn(auth);
+            when(jwtUtils.generateAccessToken(userDetails)).thenReturn("token");
+            when(refreshTokenService.createRefreshToken("testuser")).thenReturn("refresh");
+            when(authMapper.toAuthResponse("token", "refresh", userDetails))
+                    .thenReturn(AuthResponse.builder().accessToken("token").build());
+
+            AuthResponse result = authService.login(request, null);
+
+            assertNotNull(result);
+            verify(loginAttemptService).resetAttempts("test@example.com");
         }
     }
 

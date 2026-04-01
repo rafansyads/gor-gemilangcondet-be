@@ -18,6 +18,8 @@ public interface LapanganRepository extends JpaRepository<Lapangan, UUID> {
 
     List<Lapangan> findByType(LapanganType type);
 
+    Optional<Lapangan> findByName(String name);
+
     /**
      * Acquires a pessimistic write lock on the court row to prevent
      * race conditions during concurrent reservation attempts.

@@ -10,8 +10,11 @@ import io.mpruy.gor_gemilangcondet.backend_api.entities.payment.PaymentMethod;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.payment.PaymentStatus;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.payment.PaymentType;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.payment.Pembayaran;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.Lapangan;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.LapanganStatus;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.Reservasi;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.ReservasiStatus;
+import io.mpruy.gor_gemilangcondet.backend_api.repository.LapanganRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.PembayaranRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.ReservasiRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.security.UserDetailsImpl;
@@ -33,6 +36,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -43,8 +47,15 @@ public class PembayaranService {
 
     private final PembayaranRepository pembayaranRepository;
     private final ReservasiRepository reservasiRepository;
+    private final LapanganRepository lapanganRepository;
 
     private static final ZoneId ZONE_JAKARTA = ZoneId.of("Asia/Jakarta");
+
+    private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
+            ".png", ".jpg", ".jpeg", ".heic", ".heif", ".webp", ".bmp");
+    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
+            "image/png", "image/jpeg", "image/heic", "image/heif",
+            "image/heif-sequence", "image/heic-sequence", "image/webp", "image/bmp", "image/x-bmp");
 
     @Value("${app.upload.dir:uploads/payment-proofs}")
     private String uploadDir;
@@ -136,10 +147,13 @@ public class PembayaranService {
             throw new BadRequestException("File bukti pembayaran wajib diunggah");
         }
 
-        // 4. Store file
+        // 4. Validate file type (images only)
+        validatePaymentProofFileType(file);
+
+        // 5. Store file
         String filename = savePaymentProofFile(reservasiId, file);
 
-        // 5. Update reservation
+        // 6. Update reservation
         reservasi.setPaymentProofUrl(filename);
         reservasi.setStatus(ReservasiStatus.MENUNGGU_KONFIRMASI_STAF);
         reservasi.setUpdatedAt(now);
@@ -216,6 +230,12 @@ public class PembayaranService {
         reservasi.setUpdatedAt(now);
         reservasiRepository.save(reservasi);
 
+        // 5. Mark Lapangan as DISEWAKAN
+        Lapangan lapangan = reservasi.getLapangan();
+        lapangan.setStatus(LapanganStatus.DISEWAKAN);
+        lapangan.setUpdatedAt(now);
+        lapanganRepository.save(lapangan);
+
         log.info("Staff {} confirmed reservation {}", staffId, reservasiId);
 
         // 6. Build response
@@ -258,6 +278,14 @@ public class PembayaranService {
         reservasi.setUpdatedAt(now);
         reservasiRepository.save(reservasi);
 
+        // Reset Lapangan to TERSEDIA
+        Lapangan lapangan = reservasi.getLapangan();
+        if (lapangan != null && lapangan.getStatus() != LapanganStatus.TERSEDIA) {
+            lapangan.setStatus(LapanganStatus.TERSEDIA);
+            lapangan.setUpdatedAt(now);
+            lapanganRepository.save(lapangan);
+        }
+
         log.info("Staff {} rejected reservation {}", staffId, reservasiId);
 
         return ConfirmPaymentResponse.builder()
@@ -289,6 +317,13 @@ public class PembayaranService {
             reservasi.setUpdatedAt(now);
             reservasiRepository.save(reservasi);
 
+            Lapangan lapangan = reservasi.getLapangan();
+            if (lapangan != null && lapangan.getStatus() != LapanganStatus.TERSEDIA) {
+                lapangan.setStatus(LapanganStatus.TERSEDIA);
+                lapangan.setUpdatedAt(now);
+                lapanganRepository.save(lapangan);
+            }
+
             log.info("Reservation {} expired (deadline: {})", reservasi.getId(), reservasi.getPaymentDeadline());
         }
 
@@ -305,6 +340,27 @@ public class PembayaranService {
             return userDetails.getUser().getId();
         }
         throw new IllegalStateException("Staff tidak terautentikasi");
+    }
+
+    /**
+     * Validates that the uploaded file is an allowed image format.
+     * Allowed: PNG, JPG/JPEG, HEIC, HEIF, WEBP, BMP.
+     */
+    private void validatePaymentProofFileType(MultipartFile file) {
+        String originalFilename = file.getOriginalFilename();
+        String extension = "";
+        if (originalFilename != null && originalFilename.contains(".")) {
+            extension = originalFilename.substring(originalFilename.lastIndexOf(".")).toLowerCase();
+        }
+        if (!ALLOWED_EXTENSIONS.contains(extension)) {
+            throw new BadRequestException(
+                    "Format file tidak didukung. Format yang diperbolehkan: PNG, JPG, JPEG, HEIC, HEIF, WEBP, BMP");
+        }
+        String contentType = file.getContentType();
+        if (contentType != null && !ALLOWED_CONTENT_TYPES.contains(contentType.toLowerCase())) {
+            throw new BadRequestException(
+                    "Tipe konten file tidak didukung. Hanya file gambar yang diperbolehkan.");
+        }
     }
 
     /**

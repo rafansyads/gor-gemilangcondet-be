@@ -4,6 +4,7 @@ import tools.jackson.databind.ObjectMapper;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.BaseRequestDto;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.users.UserDto;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.users.requests.UpdateProfileRequest;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.users.responses.UpdateProfileResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.RoleName;
 import io.mpruy.gor_gemilangcondet.backend_api.service.UserService;
 import io.mpruy.gor_gemilangcondet.backend_api.security.jwt.JwtTokenFilter;
@@ -96,18 +97,28 @@ class UserControllerTest {
         UpdateProfileRequest updateReq = new UpdateProfileRequest();
         updateReq.setUsername("updated");
         updateReq.setEmail("updated@test.com");
+
         BaseRequestDto<UpdateProfileRequest> request = new BaseRequestDto<>();
         request.setData(updateReq);
 
-        UserDto updated = UserDto.builder()
-                .id(UUID.randomUUID()).username("updated").email("updated@test.com")
-                .role(RoleName.MEMBER).build();
-        when(userService.updateProfile(any())).thenReturn(updated);
+        UserDto updatedUser = UserDto.builder()
+                .id(UUID.randomUUID())
+                .username("updated")
+                .email("updated@test.com")
+                .role(RoleName.MEMBER)
+                .build();
+        UpdateProfileResponse updated = UpdateProfileResponse.builder()
+                .user(updatedUser)
+                .accessToken("new-access-token")
+                .refreshToken("new-refresh-token")
+                .build();
+
+        when(userService.updateProfile(any(UpdateProfileRequest.class))).thenReturn(updated);
 
         mockMvc.perform(put("/users/profile")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.username").value("updated"));
+                .andExpect(jsonPath("$.data.user.username").value("updated"));
     }
 }

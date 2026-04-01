@@ -1,20 +1,9 @@
 package io.mpruy.gor_gemilangcondet.backend_api.controller;
 
-import tools.jackson.databind.ObjectMapper;
-import io.mpruy.gor_gemilangcondet.backend_api.dto.BaseRequestDto;
-import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.requests.LoginRequest;
-import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.requests.RefreshTokenRequest;
-import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.requests.RegisterRequest;
-import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.responses.AuthResponse;
-import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.responses.RegisterResponse;
-import io.mpruy.gor_gemilangcondet.backend_api.dto.users.UserDto;
-import io.mpruy.gor_gemilangcondet.backend_api.entities.users.RoleName;
-import io.mpruy.gor_gemilangcondet.backend_api.service.AuthService;
-import io.mpruy.gor_gemilangcondet.backend_api.security.jwt.JwtTokenFilter;
-import io.mpruy.gor_gemilangcondet.backend_api.security.jwt.JwtUtils;
-import io.mpruy.gor_gemilangcondet.backend_api.security.service.JwtTokenBlacklist;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.cache.autoconfigure.CacheAutoConfiguration;
@@ -24,11 +13,23 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import io.mpruy.gor_gemilangcondet.backend_api.dto.BaseRequestDto;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.requests.LoginRequest;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.requests.RefreshTokenRequest;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.requests.RegisterRequest;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.responses.AuthResponse;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.responses.RegisterResponse;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.users.UserDto;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.users.RoleName;
+import io.mpruy.gor_gemilangcondet.backend_api.security.jwt.JwtTokenFilter;
+import io.mpruy.gor_gemilangcondet.backend_api.security.jwt.JwtUtils;
+import io.mpruy.gor_gemilangcondet.backend_api.security.service.JwtTokenBlacklist;
+import io.mpruy.gor_gemilangcondet.backend_api.service.AuthService;
+import tools.jackson.databind.ObjectMapper;
 
 @WebMvcTest(AuthController.class)
 @AutoConfigureMockMvc(addFilters = false)
@@ -54,7 +55,7 @@ class AuthControllerTest {
     @DisplayName("POST /auth/login → 200 OK")
     void login_Success() throws Exception {
         LoginRequest loginReq = new LoginRequest();
-        loginReq.setUsername("testuser");
+        loginReq.setUsernameOrEmail("testuser");
         loginReq.setPassword("Pass1234");
         BaseRequestDto<LoginRequest> request = new BaseRequestDto<>();
         request.setData(loginReq);
@@ -77,7 +78,7 @@ class AuthControllerTest {
     @DisplayName("POST /auth/login-admin → 200 OK")
     void loginAdmin_Success() throws Exception {
         LoginRequest loginReq = new LoginRequest();
-        loginReq.setUsername("admin");
+        loginReq.setUsernameOrEmail("admin");
         loginReq.setPassword("Pass1234");
         BaseRequestDto<LoginRequest> request = new BaseRequestDto<>();
         request.setData(loginReq);

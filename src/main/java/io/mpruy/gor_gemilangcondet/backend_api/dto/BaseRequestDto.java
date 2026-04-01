@@ -1,7 +1,9 @@
 package io.mpruy.gor_gemilangcondet.backend_api.dto;
 
 import java.time.Instant;
+
 import com.fasterxml.jackson.annotation.JsonFormat;
+
 import jakarta.validation.Valid;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -21,4 +23,3 @@ public class BaseRequestDto<T> {
     @Valid
     private T data;
 }
-
