@@ -20,6 +20,8 @@ public interface LapanganRepository extends JpaRepository<Lapangan, UUID> {
 
     Optional<Lapangan> findByName(String name);
 
+    boolean existsByKode(String kode);
+
     /**
      * Acquires a pessimistic write lock on the court row to prevent
      * race conditions during concurrent reservation attempts.

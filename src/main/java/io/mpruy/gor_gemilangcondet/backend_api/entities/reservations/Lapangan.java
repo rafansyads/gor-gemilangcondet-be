@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -21,6 +23,17 @@ public class Lapangan {
 
     @Column(nullable = false)
     private String name;
+
+    @Column(nullable = false, unique = true)
+    private String kode;
+
+    private String jenisLantai;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "lapangan_fasilitas", joinColumns = @JoinColumn(name = "lapangan_id"))
+    @Column(name = "fasilitas")
+    @Builder.Default
+    private List<String> fasilitas = new ArrayList<>();
 
     private LocalDateTime createdAt;
 
@@ -40,4 +53,7 @@ public class Lapangan {
 
     @Column(nullable = false)
     private double tarifPerJam;
+
+    /** Relative path to the court image, served at /api/courts/image/{filename} */
+    private String imageUrl;
 }

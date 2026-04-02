@@ -18,7 +18,7 @@ public class FadhilCourtAvailabilityDto {
     private UUID lapanganId;
     private String lapanganName;
 
-    /** Tipe lapangan: BADMINTON, FUTSAL, BASKET, VOLI, TENIS */
+    /** Tipe lapangan: BADMINTON */
     private String lapanganType;
 
     private double tarifPerJam;

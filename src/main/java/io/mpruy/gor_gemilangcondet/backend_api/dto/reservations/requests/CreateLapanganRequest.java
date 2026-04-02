@@ -4,14 +4,23 @@ import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.LapanganTyp
 import jakarta.validation.constraints.*;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class CreateLapanganRequest {
 
     @NotBlank(message = "Nama lapangan wajib diisi")
     private String name;
 
+    @NotBlank(message = "Kode lapangan wajib diisi")
+    private String kode;
+
     @NotNull(message = "Tipe lapangan wajib diisi")
     private LapanganType type;
+
+    private String jenisLantai;
+
+    private List<String> fasilitas;
 
     @Min(value = 1, message = "Tarif per jam minimal Rp 1")
     private double tarifPerJam;

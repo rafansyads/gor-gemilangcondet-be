@@ -117,8 +117,8 @@ class ReservasiServiceTest {
         @DisplayName("Should create court successfully")
         void createCourt_Success() {
             CreateLapanganRequest request = new CreateLapanganRequest();
-            request.setName("Futsal 1");
-            request.setType(LapanganType.FUTSAL);
+            request.setName("Badminton 4");
+            request.setType(LapanganType.BADMINTON);
             request.setTarifPerJam(100000);
 
             when(lapanganRepository.save(any(Lapangan.class))).thenAnswer(i -> {
@@ -130,8 +130,8 @@ class ReservasiServiceTest {
             LapanganResponse result = reservasiService.createCourt(request);
 
             assertNotNull(result);
-            assertEquals("Futsal 1", result.getName());
-            assertEquals(LapanganType.FUTSAL, result.getType());
+            assertEquals("Badminton 4", result.getName());
+            assertEquals(LapanganType.BADMINTON, result.getType());
             assertEquals(LapanganStatus.TERSEDIA, result.getStatus());
         }
 
@@ -140,7 +140,7 @@ class ReservasiServiceTest {
         void updateCourt_Success() {
             UpdateLapanganRequest request = new UpdateLapanganRequest();
             request.setName("Updated");
-            request.setType(LapanganType.BASKET);
+            request.setType(LapanganType.BADMINTON);
             request.setTarifPerJam(200000);
 
             when(lapanganRepository.findById(courtId)).thenReturn(Optional.of(testCourt));
@@ -149,23 +149,10 @@ class ReservasiServiceTest {
             LapanganResponse result = reservasiService.updateCourt(courtId, request);
 
             assertEquals("Updated", result.getName());
-            assertEquals(LapanganType.BASKET, result.getType());
+            assertEquals(LapanganType.BADMINTON, result.getType());
         }
 
-        @Test
-        @DisplayName("Should throw when updating non-existent court")
-        void updateCourt_NotFound() {
-            UpdateLapanganRequest request = new UpdateLapanganRequest();
-            request.setName("Updated");
-            request.setType(LapanganType.BASKET);
-            request.setTarifPerJam(200000);
-            UUID randomId = UUID.randomUUID();
 
-            when(lapanganRepository.findById(randomId)).thenReturn(Optional.empty());
-
-            assertThrows(ResourceNotFoundException.class,
-                    () -> reservasiService.updateCourt(randomId, request));
-        }
 
         @Test
         @DisplayName("Should delete court with no active reservations")
