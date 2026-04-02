@@ -5,15 +5,20 @@ import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.LapanganTyp
 import lombok.Builder;
 import lombok.Data;
 
+import java.util.List;
 import java.util.UUID;
 
 @Data
 @Builder
 public class LapanganResponse {
+    private String imageUrl;
 
     private UUID id;
     private String name;
+    private String kode;
     private LapanganType type;
     private LapanganStatus status;
+    private String jenisLantai;
+    private List<String> fasilitas;
     private double tarifPerJam;
 }

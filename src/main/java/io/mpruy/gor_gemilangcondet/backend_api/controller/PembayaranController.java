@@ -2,6 +2,7 @@ package io.mpruy.gor_gemilangcondet.backend_api.controller;
 
 import io.mpruy.gor_gemilangcondet.backend_api.dto.BaseResponseDto;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.responses.ConfirmPaymentResponse;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.responses.InvoiceResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.responses.PembayaranResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.responses.ReservasiResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.service.PembayaranService;
@@ -56,6 +57,19 @@ public class PembayaranController {
         List<ReservasiResponse> reservations = pembayaranService.getReservationsForStaff();
         return ResponseUtil.success(reservations,
                 "Data reservasi untuk staf berhasil diambil", HttpStatus.OK)
+                .toBuilder().build();
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // GET /payments/staff-invoices — Invoice-centric list for staff
+    // ──────────────────────────────────────────────────────────────────────────
+
+    @GetMapping("/staff-invoices")
+    @PreAuthorize("hasAnyAuthority('STAF_LAPANGAN', 'STAF_TOKO', 'OWNER', 'ADMIN')")
+    public ResponseEntity<BaseResponseDto<List<InvoiceResponse>>> getStaffInvoices() {
+        List<InvoiceResponse> invoices = pembayaranService.getInvoicesForStaff();
+        return ResponseUtil.success(invoices,
+                "Data invoice untuk staf berhasil diambil", HttpStatus.OK)
                 .toBuilder().build();
     }
 

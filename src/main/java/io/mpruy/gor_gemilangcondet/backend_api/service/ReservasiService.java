@@ -1,6 +1,7 @@
 package io.mpruy.gor_gemilangcondet.backend_api.service;
 
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.requests.*;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.responses.BatchReservasiResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.responses.*;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.*;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.AlatOlahraga;
@@ -47,11 +48,7 @@ public class ReservasiService {
 
         /** Mapping from court type to compatible equipment types for rental. */
         private static final Map<LapanganType, List<BarangType>> COURT_EQUIPMENT_MAP = Map.of(
-                        LapanganType.BADMINTON, List.of(BarangType.RAKET, BarangType.AKSESORIS, BarangType.SEPATU),
-                        LapanganType.FUTSAL, List.of(BarangType.BOLA, BarangType.SEPATU),
-                        LapanganType.BASKET, List.of(BarangType.BOLA, BarangType.SEPATU),
-                        LapanganType.VOLI, List.of(BarangType.BOLA, BarangType.SEPATU),
-                        LapanganType.TENIS, List.of(BarangType.RAKET, BarangType.BOLA, BarangType.SEPATU));
+                        LapanganType.BADMINTON, List.of(BarangType.RAKET));
 
         // ──────────────────────────────────────────────────────────────────────────
         // Get All Courts
@@ -94,27 +91,16 @@ public class ReservasiService {
                 LocalDateTime dayStart = date.atTime(OPENING_HOUR, 0);
                 LocalDateTime dayEnd = date.atTime(CLOSING_HOUR, 0);
 
-                // Determine the earliest visible slot (next full hour if today)
+                // Determine the first bookable slot (next full hour if today).
+                // Past slots are still returned but marked as available=false.
                 LocalDateTime now = LocalDateTime.now(ZONE_JAKARTA);
-                int firstSlotHour = OPENING_HOUR;
+                int firstBookableHour = OPENING_HOUR;
 
                 if (date.equals(now.toLocalDate())) {
-                        firstSlotHour = now.getHour() + 1;
-                        if (firstSlotHour < OPENING_HOUR)
-                                firstSlotHour = OPENING_HOUR;
-                        if (firstSlotHour >= CLOSING_HOUR) {
-                                // No more slots available today
-                                return courts.stream()
-                                                .map(c -> CourtAvailabilityResponse.builder()
-                                                                .lapanganId(c.getId())
-                                                                .lapanganName(c.getName())
-                                                                .lapanganType(c.getType())
-                                                                .tarifPerJam(c.getTarifPerJam())
-                                                                .date(date)
-                                                                .slots(Collections.emptyList())
-                                                                .build())
-                                                .collect(Collectors.toList());
-                        }
+                        firstBookableHour = now.getHour() + 1;
+                        if (firstBookableHour < OPENING_HOUR)
+                                firstBookableHour = OPENING_HOUR;
+                        // Do NOT return early — we still show all past slots as unavailable
                 }
 
                 List<CourtAvailabilityResponse> result = new ArrayList<>();
@@ -123,7 +109,7 @@ public class ReservasiService {
                         // Courts under maintenance are fully unavailable
                         if (court.getStatus() == LapanganStatus.DALAM_PERBAIKAN) {
                                 List<SlotAvailabilityResponse> allUnavailable = new ArrayList<>();
-                                for (int h = firstSlotHour; h < CLOSING_HOUR; h++) {
+                                for (int h = OPENING_HOUR; h < CLOSING_HOUR; h++) {
                                         allUnavailable.add(SlotAvailabilityResponse.builder()
                                                         .startHour(h).endHour(h + 1).available(false).build());
                                 }
@@ -143,9 +129,16 @@ public class ReservasiService {
                                         court.getId(), dayStart, dayEnd, INACTIVE_STATUSES);
 
                         List<SlotAvailabilityResponse> slots = new ArrayList<>();
-                        for (int h = firstSlotHour; h < CLOSING_HOUR; h++) {
+                        for (int h = OPENING_HOUR; h < CLOSING_HOUR; h++) {
                                 LocalDateTime slotStart = date.atTime(h, 0);
                                 LocalDateTime slotEnd = date.atTime(h + 1, 0);
+
+                                // Past slots (for today) are always unavailable for booking
+                                if (h < firstBookableHour) {
+                                        slots.add(SlotAvailabilityResponse.builder()
+                                                        .startHour(h).endHour(h + 1).available(false).build());
+                                        continue;
+                                }
 
                                 boolean isAvailable = reservations.stream()
                                                 .noneMatch(r -> r.getReservationStart().isBefore(slotEnd) &&
@@ -172,6 +165,7 @@ public class ReservasiService {
                                         .lapanganType(court.getType())
                                         .tarifPerJam(court.getTarifPerJam())
                                         .date(date)
+                                        .imageUrl(court.getImageUrl())
                                         .slots(slots)
                                         .build());
                 }
@@ -424,10 +418,17 @@ public class ReservasiService {
 
         @Transactional
         public LapanganResponse createCourt(CreateLapanganRequest request) {
+                if (lapanganRepository.existsByKode(request.getKode())) {
+                        throw new BadRequestException(
+                                        "Kode lapangan '" + request.getKode() + "' sudah digunakan");
+                }
                 LocalDateTime now = LocalDateTime.now(ZONE_JAKARTA);
                 Lapangan lapangan = Lapangan.builder()
                                 .name(request.getName())
+                                .kode(request.getKode())
                                 .type(request.getType())
+                                .jenisLantai(request.getJenisLantai())
+                                .fasilitas(request.getFasilitas() != null ? request.getFasilitas() : List.of())
                                 .tarifPerJam(request.getTarifPerJam())
                                 .status(LapanganStatus.TERSEDIA)
                                 .createdAt(now)
@@ -444,6 +445,10 @@ public class ReservasiService {
                 lapangan.setName(request.getName());
                 lapangan.setType(request.getType());
                 lapangan.setTarifPerJam(request.getTarifPerJam());
+                lapangan.setJenisLantai(request.getJenisLantai());
+                if (request.getFasilitas() != null) {
+                        lapangan.setFasilitas(request.getFasilitas());
+                }
                 lapangan.setUpdatedAt(LocalDateTime.now(ZONE_JAKARTA));
                 lapanganRepository.save(lapangan);
                 return toLapanganResponse(lapangan);
@@ -474,6 +479,30 @@ public class ReservasiService {
                 return toLapanganResponse(lapangan);
         }
 
+        @Transactional
+        public LapanganResponse uploadCourtImage(UUID id, org.springframework.web.multipart.MultipartFile file) {
+                Lapangan lapangan = lapanganRepository.findById(id)
+                                .orElseThrow(() -> new ResourceNotFoundException("Lapangan tidak ditemukan: " + id));
+                try {
+                        String originalFilename = file.getOriginalFilename();
+                        String ext = (originalFilename != null && originalFilename.contains("."))
+                                        ? originalFilename.substring(originalFilename.lastIndexOf('.'))
+                                        : ".jpg";
+                        String filename = "court-" + id + "-" + System.currentTimeMillis() + ext;
+                        java.nio.file.Path uploadPath = java.nio.file.Paths.get("uploads/court-images");
+                        java.nio.file.Files.createDirectories(uploadPath);
+                        java.nio.file.Path filePath = uploadPath.resolve(filename);
+                        java.nio.file.Files.copy(file.getInputStream(), filePath,
+                                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                        lapangan.setImageUrl(filename);
+                        lapangan.setUpdatedAt(LocalDateTime.now(ZONE_JAKARTA));
+                        lapanganRepository.save(lapangan);
+                } catch (Exception e) {
+                        throw new BadRequestException("Gagal mengunggah gambar: " + e.getMessage());
+                }
+                return toLapanganResponse(lapangan);
+        }
+
         // ──────────────────────────────────────────────────────────────────────────
         // Get Reservations
         // ──────────────────────────────────────────────────────────────────────────
@@ -489,6 +518,126 @@ public class ReservasiService {
         public ReservasiResponse getReservationById(UUID id) {
                 Reservasi reservasi = reservasiRepository.findByIdWithLapangan(id)
                                 .orElseThrow(() -> new ResourceNotFoundException("Reservasi tidak ditemukan: " + id));
+                return toReservasiResponse(reservasi);
+        }
+
+        // ──────────────────────────────────────────────────────────────────────────
+        // Get Batch Reservations
+        // ──────────────────────────────────────────────────────────────────────────
+
+        @Transactional(readOnly = true)
+        public List<ReservasiResponse> getBatchByBatchId(UUID batchId) {
+                return reservasiRepository.findByBatchId(batchId).stream()
+                                .map(this::toReservasiResponse)
+                                .collect(Collectors.toList());
+        }
+
+        // ──────────────────────────────────────────────────────────────────────────
+        // Create Batch Reservation (multiple non-consecutive slots, one transaction)
+        // ──────────────────────────────────────────────────────────────────────────
+
+        /**
+         * Creates multiple reservations (for non-consecutive time slots) under a single
+         * batch ID, so they can be paid together and tracked as one transaction.
+         * Each reservation is validated and created atomically. If any slot is
+         * already taken the whole batch fails (transaction rollback).
+         */
+        @Transactional
+        public BatchReservasiResponse createBatchReservation(CreateBatchReservasiRequest request) {
+                UUID sharedBatchId = UUID.randomUUID();
+                List<ReservasiResponse> responses = new ArrayList<>();
+                double total = 0;
+
+                for (CreateReservasiRequest req : request.getReservations()) {
+                        ReservasiResponse r = createReservationWithBatchId(req, sharedBatchId);
+                        responses.add(r);
+                        total += r.getTotalPayment();
+                }
+
+                return BatchReservasiResponse.builder()
+                                .batchId(sharedBatchId)
+                                .reservations(responses)
+                                .totalPayment(total)
+                                .primaryReservationId(responses.get(0).getId())
+                                .build();
+        }
+
+        /**
+         * Internal variant of {@link #createReservation} that stamps a {@code batchId}
+         * onto the saved entity. Shares all validation/locking logic.
+         */
+        private ReservasiResponse createReservationWithBatchId(CreateReservasiRequest request, UUID batchId) {
+                LocalDateTime now = LocalDateTime.now(ZONE_JAKARTA);
+
+                if (request.getReservationStart().isBefore(now)) {
+                        throw new BadRequestException("Tanggal reservasi tidak boleh di masa lalu");
+                }
+                if (request.getReservationStart().getMinute() != 0 ||
+                                request.getReservationStart().getSecond() != 0) {
+                        throw new BadRequestException(
+                                        "Waktu reservasi harus dimulai pada jam tepat (contoh: 08:00, 09:00)");
+                }
+                int startHour = request.getReservationStart().getHour();
+                int endHour = startHour + request.getDurationInHours();
+                if (startHour < OPENING_HOUR || endHour > CLOSING_HOUR) {
+                        throw new BadRequestException(
+                                        String.format("Jam operasional GOR: %02d:00 - %02d:00", OPENING_HOUR, CLOSING_HOUR));
+                }
+
+                Lapangan lapangan = lapanganRepository.findByIdWithPessimisticLock(request.getLapanganId())
+                                .orElseThrow(() -> new ResourceNotFoundException("Lapangan tidak ditemukan"));
+                if (lapangan.getStatus() != LapanganStatus.TERSEDIA) {
+                        throw new BadRequestException(
+                                        "Lapangan sedang tidak tersedia (status: " + lapangan.getStatus() + ")");
+                }
+
+                LocalDateTime reservationEnd = request.getReservationStart()
+                                .plusHours(request.getDurationInHours());
+
+                if (lapangan.getMaintenanceStart() != null && lapangan.getMaintenanceEnd() != null) {
+                        if (lapangan.getMaintenanceStart().isBefore(reservationEnd) &&
+                                        lapangan.getMaintenanceEnd().isAfter(request.getReservationStart())) {
+                                throw new BadRequestException(
+                                                "Lapangan sedang dalam perbaikan pada waktu yang dipilih");
+                        }
+                }
+
+                List<Reservasi> overlapping = reservasiRepository.findOverlappingReservations(
+                                lapangan.getId(), request.getReservationStart(), reservationEnd, INACTIVE_STATUSES);
+                if (!overlapping.isEmpty()) {
+                        throw new BadRequestException("Jadwal lapangan sudah terisi pada waktu yang dipilih");
+                }
+
+                List<UUID> expandedRentList = new ArrayList<>();
+                double equipmentCost = 0;
+                if (request.getRentItems() != null && !request.getRentItems().isEmpty()) {
+                        equipmentCost = processRentItems(
+                                        request.getRentItems(),
+                                        request.getReservationStart(),
+                                        reservationEnd,
+                                        expandedRentList);
+                }
+
+                double totalCost = lapangan.getTarifPerJam() * request.getDurationInHours() + equipmentCost;
+
+                Reservasi reservasi = Reservasi.builder()
+                                .batchId(batchId)
+                                .reservationStart(request.getReservationStart())
+                                .reservationEnd(reservationEnd)
+                                .lapangan(lapangan)
+                                .userId(request.getUserId())
+                                .namaWakil(request.getNamaWakil())
+                                .nomorTelepon(request.getNomorTelepon())
+                                .jumlahOrang(request.getJumlahOrang())
+                                .totalPayment(totalCost)
+                                .status(ReservasiStatus.BELUM_DIBAYAR)
+                                .paymentDeadline(now.plusMinutes(PAYMENT_DEADLINE_MINUTES))
+                                .rentList(expandedRentList)
+                                .createdAt(now)
+                                .updatedAt(now)
+                                .build();
+
+                reservasiRepository.save(reservasi);
                 return toReservasiResponse(reservasi);
         }
 
@@ -586,9 +735,13 @@ public class ReservasiService {
                 return LapanganResponse.builder()
                                 .id(lapangan.getId())
                                 .name(lapangan.getName())
+                                .kode(lapangan.getKode())
                                 .type(lapangan.getType())
                                 .status(lapangan.getStatus())
+                                .jenisLantai(lapangan.getJenisLantai())
+                                .fasilitas(lapangan.getFasilitas())
                                 .tarifPerJam(lapangan.getTarifPerJam())
+                                .imageUrl(lapangan.getImageUrl())
                                 .build();
         }
 
@@ -601,6 +754,7 @@ public class ReservasiService {
                 return ReservasiResponse.builder()
                                 .id(reservasi.getId())
                                 .userId(reservasi.getUserId())
+                                .batchId(reservasi.getBatchId())
                                 .lapanganId(reservasi.getLapangan().getId())
                                 .lapanganName(reservasi.getLapangan().getName())
                                 .lapanganType(reservasi.getLapangan().getType())
