@@ -24,6 +24,10 @@ public class Reservasi {
 
     private UUID paymentId;
 
+    /** Groups multiple non-consecutive reservations into one transaction. Null = standalone booking. */
+    @Column(name = "batch_id")
+    private UUID batchId;
+
     @Column(nullable = false)
     private double totalPayment;
 

@@ -15,6 +15,7 @@ public class ReservasiResponse {
 
     private UUID id;
     private UUID userId;
+    private UUID batchId;
     private UUID lapanganId;
     private String lapanganName;
     private LapanganType lapanganType;

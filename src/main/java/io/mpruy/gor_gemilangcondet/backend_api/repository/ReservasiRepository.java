@@ -65,4 +65,8 @@ public interface ReservasiRepository extends JpaRepository<Reservasi, UUID> {
                         "AND r.paymentDeadline IS NOT NULL " +
                         "AND r.paymentDeadline < :now")
         List<Reservasi> findExpiredReservations(@Param("now") LocalDateTime now);
+
+        /** Finds all reservations sharing the same batchId (for multi-slot bookings). */
+        @Query("SELECT r FROM Reservasi r JOIN FETCH r.lapangan WHERE r.batchId = :batchId ORDER BY r.reservationStart")
+        List<Reservasi> findByBatchId(@Param("batchId") UUID batchId);
 }

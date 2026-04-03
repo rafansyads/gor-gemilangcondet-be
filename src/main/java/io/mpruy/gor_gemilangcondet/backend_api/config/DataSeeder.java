@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+import jakarta.persistence.EntityManager;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
@@ -22,6 +23,7 @@ import io.mpruy.gor_gemilangcondet.backend_api.repository.AlatOlahragaRepository
 import io.mpruy.gor_gemilangcondet.backend_api.repository.RoleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.annotation.Order;
 
 /**
  * Ensures every {@link RoleName} value has a corresponding row in the
@@ -31,6 +33,7 @@ import lombok.extern.slf4j.Slf4j;
  * are left untouched.
  */
 @Component
+@Order(1)
 @RequiredArgsConstructor
 @Slf4j
 public class DataSeeder implements ApplicationRunner {
@@ -38,12 +41,11 @@ public class DataSeeder implements ApplicationRunner {
     private final RoleRepository roleRepository;
     private final LapanganRepository lapanganRepository;
     private final AlatOlahragaRepository alatOlahragaRepository;
+    private final EntityManager entityManager;
 
     @Override
-    @Transactional
     public void run(ApplicationArguments args) {
         seedRoles();
-        seedCourts();
         seedLapangan(); // nantinya tergantung GOR
         seedAlatOlahraga(); // nantinya tergantung GOR, bisa jadi tidak ada alat olahraga yang disewakan
         resetAllLapanganToTersedia();
@@ -64,35 +66,6 @@ public class DataSeeder implements ApplicationRunner {
             if (roleRepository.findByRoleName(roleName).isEmpty()) {
                 roleRepository.save(Role.builder().roleName(roleName).build());
                 log.info("Seeded role: {}", roleName);
-            }
-        }
-    }
-
-    /**
-     * Menyiapkan 6 lapangan (court) yang merepresentasikan lapangan badminton
-     * di GOR Gemilang Condet (id 1–6, nama "Court 1" s/d "Court 6").
-     *
-     * <p>
-     * Metode ini idempotent — jika data sudah ada, tidak akan membuat duplikasi.
-     *
-     * @see Court
-     * @see CourtRepository
-     */
-    private void seedCourts() {
-        for (int i = 1; i <= 6; i++) {
-            String name = "Court " + i;
-            if (lapanganRepository.findByName(name).isEmpty()) {
-                LocalDateTime now = LocalDateTime.now();
-                Lapangan court = Lapangan.builder()
-                        .name(name)
-                        .type(LapanganType.BADMINTON)
-                        .status(LapanganStatus.TERSEDIA)
-                        .tarifPerJam(50000)
-                        .createdAt(now)
-                        .updatedAt(now)
-                        .build();
-                lapanganRepository.save(court);
-                log.info("Seeded court: {} ({})", court.getName(), court.getType());
             }
         }
     }
@@ -168,22 +141,16 @@ public class DataSeeder implements ApplicationRunner {
 
         LocalDateTime now = LocalDateTime.now();
         List<Lapangan> courts = List.of(
-                Lapangan.builder().name("Badminton 1").type(LapanganType.BADMINTON)
+                Lapangan.builder().name("Badminton 1").kode("BDM-001").type(LapanganType.BADMINTON)
+                        .jenisLantai("Vinyl").fasilitas(List.of("LED Lighting", "Fan", "Vinyl Flooring"))
                         .status(LapanganStatus.TERSEDIA).tarifPerJam(50000).createdAt(now)
                         .updatedAt(now).build(),
-                Lapangan.builder().name("Badminton 2").type(LapanganType.BADMINTON)
+                Lapangan.builder().name("Badminton 2").kode("BDM-002").type(LapanganType.BADMINTON)
+                        .jenisLantai("Vinyl").fasilitas(List.of("LED Lighting", "Fan", "Vinyl Flooring"))
                         .status(LapanganStatus.TERSEDIA).tarifPerJam(50000).createdAt(now)
                         .updatedAt(now).build(),
-                Lapangan.builder().name("Badminton 3").type(LapanganType.BADMINTON)
-                        .status(LapanganStatus.TERSEDIA).tarifPerJam(150000).createdAt(now)
-                        .updatedAt(now).build(),
-                Lapangan.builder().name("Badminton 4").type(LapanganType.BADMINTON)
-                        .status(LapanganStatus.TERSEDIA).tarifPerJam(150000).createdAt(now)
-                        .updatedAt(now).build(),
-                Lapangan.builder().name("Badminton 5").type(LapanganType.BADMINTON)
-                        .status(LapanganStatus.TERSEDIA).tarifPerJam(150000).createdAt(now)
-                        .updatedAt(now).build(),
-                Lapangan.builder().name("Badminton 6").type(LapanganType.BADMINTON)
+                Lapangan.builder().name("Badminton 3").kode("BDM-003").type(LapanganType.BADMINTON)
+                        .jenisLantai("Vinyl").fasilitas(List.of("LED Lighting", "Fan", "Vinyl Flooring"))
                         .status(LapanganStatus.TERSEDIA).tarifPerJam(150000).createdAt(now)
                         .updatedAt(now).build());
 
@@ -211,10 +178,29 @@ public class DataSeeder implements ApplicationRunner {
 
     /**
      * Development-seeding.
+     * Uses JOINED inheritance — AlatOlahraga extends Barang. The unique constraint
+     * on 'name' lives in the parent 'barang' table. On schema changes the join
+     * table may be empty while 'barang' still holds orphaned rows.
+     * Fix: delete orphaned barang rows first via native query, then re-seed.
      */
-    private void seedAlatOlahraga() {
-        if (alatOlahragaRepository.count() > 0)
-            return;
+    @Transactional
+    public void seedAlatOlahraga() {
+        // Delete orphaned barang rows (no matching alat_olahraga child) first
+        try {
+            int deleted = entityManager
+                    .createNativeQuery(
+                            "DELETE FROM barang WHERE id NOT IN (SELECT id FROM alat_olahraga)")
+                    .executeUpdate();
+            if (deleted > 0) {
+                log.info("Cleaned up {} orphaned barang row(s)", deleted);
+            }
+            entityManager.flush();
+        } catch (Exception ex) {
+            log.warn("Could not clean orphaned barang rows: {}", ex.getMessage());
+        }
+
+        // If alat_olahraga already has rows, stop
+        if (alatOlahragaRepository.count() > 0) return;
 
         LocalDateTime now = LocalDateTime.now();
         List<AlatOlahraga> equipment = List.of(

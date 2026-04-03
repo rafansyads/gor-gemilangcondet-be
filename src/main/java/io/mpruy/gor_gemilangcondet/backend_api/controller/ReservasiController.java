@@ -2,6 +2,7 @@ package io.mpruy.gor_gemilangcondet.backend_api.controller;
 
 import io.mpruy.gor_gemilangcondet.backend_api.dto.BaseRequestDto;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.BaseResponseDto;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.requests.CreateBatchReservasiRequest;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.requests.CreateReservasiRequest;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.requests.RescheduleReservasiRequest;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.responses.*;
@@ -141,6 +142,32 @@ public class ReservasiController {
             @Validated @RequestBody BaseRequestDto<RescheduleReservasiRequest> request) {
         ReservasiResponse response = reservasiService.rescheduleReservation(id, request.getData());
         return ResponseUtil.success(response, "Reservasi berhasil dijadwal ulang", HttpStatus.OK)
+                .toBuilder().build();
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // POST /bookings/reserve-batch — Create batch reservation (multiple non-consecutive slots)
+    // ──────────────────────────────────────────────────────────────────────────
+
+    @PreAuthorize("hasAnyAuthority('GUEST', 'MEMBER', 'ADMIN', 'STAF_LAPANGAN')")
+    @PostMapping("/reserve-batch")
+    public ResponseEntity<BaseResponseDto<BatchReservasiResponse>> createBatchReservation(
+            @Validated @RequestBody BaseRequestDto<CreateBatchReservasiRequest> request) {
+        BatchReservasiResponse response = reservasiService.createBatchReservation(request.getData());
+        return ResponseUtil.success(response, "Batch reservasi berhasil dibuat", HttpStatus.CREATED)
+                .toBuilder().build();
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // GET /bookings/batch/{batchId} — Get all reservations in a batch
+    // ──────────────────────────────────────────────────────────────────────────
+
+    @PreAuthorize("hasAnyAuthority('GUEST', 'MEMBER', 'ADMIN', 'STAF_LAPANGAN')")
+    @GetMapping("/batch/{batchId}")
+    public ResponseEntity<BaseResponseDto<List<ReservasiResponse>>> getBatchReservations(
+            @PathVariable UUID batchId) {
+        List<ReservasiResponse> reservations = reservasiService.getBatchByBatchId(batchId);
+        return ResponseUtil.success(reservations, "Data batch reservasi berhasil diambil", HttpStatus.OK)
                 .toBuilder().build();
     }
 }
