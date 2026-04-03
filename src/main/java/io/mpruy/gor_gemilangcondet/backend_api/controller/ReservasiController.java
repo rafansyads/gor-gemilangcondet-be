@@ -4,6 +4,7 @@ import io.mpruy.gor_gemilangcondet.backend_api.dto.BaseRequestDto;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.BaseResponseDto;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.requests.CreateBatchReservasiRequest;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.requests.CreateReservasiRequest;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.requests.RescheduleBatchRequest;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.requests.RescheduleReservasiRequest;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.responses.*;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.LapanganType;
@@ -142,6 +143,20 @@ public class ReservasiController {
             @Validated @RequestBody BaseRequestDto<RescheduleReservasiRequest> request) {
         ReservasiResponse response = reservasiService.rescheduleReservation(id, request.getData());
         return ResponseUtil.success(response, "Reservasi berhasil dijadwal ulang", HttpStatus.OK)
+                .toBuilder().build();
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // PUT /bookings/reschedule-batch/{batchId} — Reschedule entire batch
+    // ──────────────────────────────────────────────────────────────────────────
+
+    @PreAuthorize("hasAnyAuthority('GUEST', 'MEMBER', 'ADMIN', 'STAF_LAPANGAN')")
+    @PutMapping("/reschedule-batch/{batchId}")
+    public ResponseEntity<BaseResponseDto<BatchReservasiResponse>> rescheduleBatch(
+            @PathVariable UUID batchId,
+            @Validated @RequestBody BaseRequestDto<RescheduleBatchRequest> request) {
+        BatchReservasiResponse response = reservasiService.rescheduleBatch(batchId, request.getData());
+        return ResponseUtil.success(response, "Batch reservasi berhasil dijadwal ulang", HttpStatus.OK)
                 .toBuilder().build();
     }
 
