@@ -1,9 +1,9 @@
 spring:
   datasource:
     # Gunakan koneksi database di PostgreSQL docker lokal
-    url: ${DB_URL}
-    username: ${DB_USER}
-    password: ${DB_PASSWORD}
+    url: ${DB_URL:jdbc:postgresql://localhost:35001/gor-gemilangcondet-dev}
+    username: ${DB_USER:gor-gemilangcondet-dev}
+    password: ${DB_PASSWORD:CLI-825.2025X}
   
   jpa:
     # "update": Kalau kamu ubah kodingan Entity, tabel database otomatis berubah
@@ -20,7 +20,7 @@ spring:
 # Konfigurasi JWT untuk development (jangan dipakai sama di production!)
 app:
   jwt:
-    secret: ${JWT_SECRET:dev-secret-key} # Ganti dengan secret yang lebih kuat di production!
+    secret: ${JWT_SECRET:dev-secret-key-yang-panjangnya-minimal-32-karakter-ya!} # Ganti dengan secret yang lebih kuat di production!
     expiration: 86400000 # 24 Jam
 
   upload:

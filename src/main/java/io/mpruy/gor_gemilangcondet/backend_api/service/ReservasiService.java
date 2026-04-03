@@ -347,6 +347,7 @@ public class ReservasiService {
         /**
          * Reschedules an existing reservation to a new time slot.
          * Applies the same validation and atomic locking as creation.
+         * Optionally changes the court if newLapanganId is provided.
          */
         @Transactional
         public ReservasiResponse rescheduleReservation(UUID reservasiId, RescheduleReservasiRequest request) {
@@ -384,16 +385,42 @@ public class ReservasiService {
                                                         CLOSING_HOUR));
                 }
 
-                // 6. Lock the court
-                Lapangan lapangan = lapanganRepository.findByIdWithPessimisticLock(
-                                reservasi.getLapangan().getId())
+                // 6. Determine target court (new or existing)
+                UUID targetLapanganId = (request.getNewLapanganId() != null)
+                                ? request.getNewLapanganId()
+                                : reservasi.getLapangan().getId();
+
+                // 7. Lock the target court
+                Lapangan lapangan = lapanganRepository.findByIdWithPessimisticLock(targetLapanganId)
                                 .orElseThrow(() -> new ResourceNotFoundException("Lapangan tidak ditemukan"));
 
-                // 7. Calculate new end time
+                // 8. Validate court is available (not under maintenance)
+                if (lapangan.getStatus() == LapanganStatus.DALAM_PERBAIKAN) {
+                        throw new BadRequestException(
+                                        "Lapangan sedang dalam perbaikan dan tidak dapat digunakan");
+                }
+
+                // 9. Validate the new court has the same type as the original
+                if (lapangan.getType() != reservasi.getLapangan().getType()) {
+                        throw new BadRequestException(
+                                        "Lapangan baru harus memiliki tipe yang sama dengan reservasi awal (" +
+                                        reservasi.getLapangan().getType() + ")");
+                }
+
+                // 10. Calculate new end time
                 LocalDateTime newEnd = request.getNewReservationStart()
                                 .plusHours(request.getDurationInHours());
 
-                // 8. Check for overlapping reservations (exclude current reservation)
+                // 11. Check maintenance window on new court
+                if (lapangan.getMaintenanceStart() != null && lapangan.getMaintenanceEnd() != null) {
+                        if (lapangan.getMaintenanceStart().isBefore(newEnd) &&
+                                        lapangan.getMaintenanceEnd().isAfter(request.getNewReservationStart())) {
+                                throw new BadRequestException(
+                                                "Lapangan sedang dalam perbaikan pada waktu yang dipilih");
+                        }
+                }
+
+                // 12. Check for overlapping reservations (exclude current reservation)
                 List<Reservasi> overlapping = reservasiRepository.findOverlappingReservations(
                                 lapangan.getId(), request.getNewReservationStart(), newEnd, INACTIVE_STATUSES);
                 overlapping.removeIf(r -> r.getId().equals(reservasiId));
@@ -402,12 +429,13 @@ public class ReservasiService {
                         throw new BadRequestException("Jadwal lapangan sudah terisi pada waktu baru yang dipilih");
                 }
 
-                // 9. Recalculate cost
+                // 13. Recalculate cost based on target court
                 double courtCost = lapangan.getTarifPerJam() * request.getDurationInHours();
                 double equipmentCost = calculateExistingEquipmentCost(reservasi.getRentList());
                 double totalCost = courtCost + equipmentCost;
 
-                // 10. Update reservation
+                // 14. Update reservation
+                reservasi.setLapangan(lapangan);
                 reservasi.setReservationStart(request.getNewReservationStart());
                 reservasi.setReservationEnd(newEnd);
                 reservasi.setTotalPayment(totalCost);
