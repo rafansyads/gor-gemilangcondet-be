@@ -22,6 +22,7 @@ import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.responses.Reg
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.Role;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.RoleName;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.User;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.users.UserStatusName;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.BadRequestException;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.ConflictException;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.TooManyRequestException;
@@ -62,6 +63,15 @@ public class AuthService {
             RoleName.OWNER,
             RoleName.ADMIN);
 
+    /**
+     * User status that allows login. Used in the login flow to check
+     * if the user is allowed to log in or not. Only users with status
+     * AKTIF are allowed to log in. Users with status PENDING,
+     * NON_AKTIF, SUSPENDED, or BANNED are not allowed
+     */
+    private static final Set<String> ALLOWED_LOGIN_STATUSES = Set.of(
+            UserStatusName.AKTIF.name());
+
     // ──────────────────────────────────────────────────────────────────────────
     // Login
     // ──────────────────────────────────────────────────────────────────────────
@@ -94,6 +104,10 @@ public class AuthService {
         loginAttemptService.resetAttempts(credential);
         SecurityContextHolder.getContext().setAuthentication(authentication);
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+
+        if (!ALLOWED_LOGIN_STATUSES.contains(userDetails.getStatus())) {
+            throw new UnauthorizedException("Akun tidak aktif. Silakan hubungi admin.");
+        }
 
         String accessToken = jwtUtils.generateAccessToken(userDetails);
         String refreshToken = refreshTokenService.createRefreshToken(userDetails.getUsername());
@@ -178,6 +192,11 @@ public class AuthService {
     }
 
     // ──────────────────────────────────────────────────────────────────────────
+    // Validate Admin Registration Role (helper for frontend to validate role before
+    // submitting)
+    // ──────────────────────────────────────────────────────────────────────────
+
+    // ──────────────────────────────────────────────────────────────────────────
     // Logout
     // ──────────────────────────────────────────────────────────────────────────
 
@@ -195,6 +214,53 @@ public class AuthService {
             refreshTokenService.deleteRefreshTokenByUsername(username);
         }
         SecurityContextHolder.clearContext();
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Account Deactivation (soft delete - using user status: NON_AKTIF)
+    // ──────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Deactivates the currently authenticated user's account by setting their
+     * status
+     * to NON_AKTIF. Also blacklists the current access token and revokes any
+     * refresh tokens.
+     *
+     * @param authorizationHeader raw {@code Authorization} header value ("Bearer
+     *                            &lt;token&gt;")
+     */
+    @Transactional
+    public void deactivateAccount(String authorizationHeader) {
+        // Validate the presence and format of the Authorization header
+        if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+            throw new BadRequestException(
+                    "Kegagalan karena Authorization header tidak diberikan atau tidak dimulai dengan 'Bearer '");
+        }
+
+        // Validasi token dan pastikan token belum diblacklist
+        String token = authorizationHeader.substring(7);
+        if (jwtTokenBlacklist.isTokenBlacklisted(token)) {
+            throw new BadRequestException("Token tidak valid atau sudah diblacklist");
+        }
+
+        // Ekstrak username dari token dan cari user terkait di database
+        String username = jwtUtils.extractUsername(token);
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new BadRequestException("User tidak ditemukan: " + username));
+
+        // Pastikan token valid sebelum melanjutkan (misalnya, cek signature dan
+        // expiration)
+        if (!jwtUtils.validateToken(token, userDetailsService.loadUserByUsername(username))) {
+            throw new BadRequestException("Token tidak valid");
+        }
+
+        // Set status user menjadi NON_AKTIF dan simpan perubahan ke database
+        user.setStatus(userMapper.toUserStatusEntity(UserStatusName.NON_AKTIF));
+        userRepository.save(user);
+
+        // Blacklist token yang digunakan untuk deaktivasi dan hapus refresh token
+        // terkait
+        logout(authorizationHeader);
     }
 
     // ──────────────────────────────────────────────────────────────────────────
