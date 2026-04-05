@@ -86,22 +86,22 @@ class LapanganControllerTest {
     @DisplayName("POST /courts → 201 Created")
     void createCourt_Success() throws Exception {
         CreateLapanganRequest createReq = new CreateLapanganRequest();
-        createReq.setName("Futsal 1");
-        createReq.setType(LapanganType.FUTSAL);
+        createReq.setName("Badminton 4");
+        createReq.setType(LapanganType.BADMINTON);
         createReq.setTarifPerJam(100000);
         BaseRequestDto<CreateLapanganRequest> request = new BaseRequestDto<>();
         request.setData(createReq);
 
         LapanganResponse resp = buildResponse();
-        resp.setName("Futsal 1");
-        resp.setType(LapanganType.FUTSAL);
+        resp.setName("Badminton 4");
+        resp.setType(LapanganType.BADMINTON);
         when(reservasiService.createCourt(any())).thenReturn(resp);
 
         mockMvc.perform(post("/courts")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.data.name").value("Futsal 1"));
+                .andExpect(jsonPath("$.data.name").value("Badminton 4"));
     }
 
     @Test
@@ -110,7 +110,7 @@ class LapanganControllerTest {
         UUID id = UUID.randomUUID();
         UpdateLapanganRequest updateReq = new UpdateLapanganRequest();
         updateReq.setName("Updated");
-        updateReq.setType(LapanganType.BASKET);
+        updateReq.setType(LapanganType.BADMINTON);
         updateReq.setTarifPerJam(200000);
         BaseRequestDto<UpdateLapanganRequest> request = new BaseRequestDto<>();
         request.setData(updateReq);

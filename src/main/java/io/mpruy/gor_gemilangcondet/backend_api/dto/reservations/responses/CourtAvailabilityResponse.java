@@ -17,5 +17,6 @@ public class CourtAvailabilityResponse {
     private LapanganType lapanganType;
     private double tarifPerJam;
     private LocalDate date;
+    private String imageUrl;
     private List<SlotAvailabilityResponse> slots;
 }

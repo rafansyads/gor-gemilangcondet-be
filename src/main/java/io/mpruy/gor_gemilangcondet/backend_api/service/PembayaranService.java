@@ -1,6 +1,8 @@
 package io.mpruy.gor_gemilangcondet.backend_api.service;
 
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.responses.ConfirmPaymentResponse;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.responses.InvoiceResponse;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.responses.InvoiceSlotItem;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.responses.PembayaranResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.responses.ReservasiResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.BadRequestException;
@@ -34,8 +36,13 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -89,6 +96,63 @@ public class PembayaranService {
         return reservasiRepository
                 .findByStatusInWithLapangan(staffStatuses).stream()
                 .map(this::toReservasiResponse)
+                .collect(Collectors.toList());
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Get Staff Invoices (Invoice-centric view, grouped by batchId)
+    // ──────────────────────────────────────────────────────────────────────────
+
+    private static final DateTimeFormatter INV_DATE_FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
+
+    @Transactional(readOnly = true)
+    public List<InvoiceResponse> getInvoicesForStaff() {
+        List<ReservasiStatus> staffStatuses = List.of(
+                ReservasiStatus.MENUNGGU_KONFIRMASI_STAF,
+                ReservasiStatus.DIKONFIRMASI);
+
+        List<Reservasi> reservations = reservasiRepository.findByStatusInWithLapangan(staffStatuses);
+
+        // Group by batchId; singletons use their own ID as key
+        Map<String, List<Reservasi>> grouped = new LinkedHashMap<>();
+        for (Reservasi r : reservations) {
+            String key = r.getBatchId() != null ? r.getBatchId().toString() : r.getId().toString();
+            grouped.computeIfAbsent(key, k -> new ArrayList<>()).add(r);
+        }
+
+        return grouped.entrySet().stream().map(entry -> {
+            List<Reservasi> group = entry.getValue();
+            group.sort(Comparator.comparing(Reservasi::getReservationStart));
+            Reservasi first = group.get(0);
+
+            double total = group.stream().mapToDouble(Reservasi::getTotalPayment).sum();
+
+            String dateStr = first.getCreatedAt().format(INV_DATE_FMT);
+            String shortId = first.getId().toString().substring(0, 5).toUpperCase();
+            String invoiceNumber = "INV-" + dateStr + "-" + shortId;
+
+            List<InvoiceSlotItem> slots = group.stream().map(r -> InvoiceSlotItem.builder()
+                    .reservationId(r.getId().toString())
+                    .courtName(r.getLapangan().getName())
+                    .start(r.getReservationStart())
+                    .end(r.getReservationEnd())
+                    .price(r.getTotalPayment())
+                    .build()).collect(Collectors.toList());
+
+            return InvoiceResponse.builder()
+                    .invoiceId(entry.getKey())
+                    .invoiceNumber(invoiceNumber)
+                    .representativeName(first.getNamaWakil())
+                    .totalAmount(total)
+                    .slotCount(group.size())
+                    .status(first.getStatus().name())
+                    .primaryReservationId(first.getId().toString())
+                    .paymentProofUrl(first.getPaymentProofUrl())
+                    .createdAt(first.getCreatedAt())
+                    .slots(slots)
+                    .build();
+        })
+                .sorted(Comparator.comparing(InvoiceResponse::getCreatedAt).reversed())
                 .collect(Collectors.toList());
     }
 
@@ -158,6 +222,19 @@ public class PembayaranService {
         reservasi.setStatus(ReservasiStatus.MENUNGGU_KONFIRMASI_STAF);
         reservasi.setUpdatedAt(now);
         reservasiRepository.save(reservasi);
+
+        // 7. If this reservation is part of a batch, propagate proof + status to
+        // siblings
+        if (reservasi.getBatchId() != null) {
+            reservasiRepository.findByBatchId(reservasi.getBatchId()).stream()
+                    .filter(r -> !r.getId().equals(reservasi.getId()))
+                    .forEach(sibling -> {
+                        sibling.setPaymentProofUrl(filename);
+                        sibling.setStatus(ReservasiStatus.MENUNGGU_KONFIRMASI_STAF);
+                        sibling.setUpdatedAt(now);
+                        reservasiRepository.save(sibling);
+                    });
+        }
 
         log.info("Payment proof uploaded for reservation {}: {}", reservasiId, filename);
 
@@ -230,11 +307,18 @@ public class PembayaranService {
         reservasi.setUpdatedAt(now);
         reservasiRepository.save(reservasi);
 
-        // 5. Mark Lapangan as DISEWAKAN
-        Lapangan lapangan = reservasi.getLapangan();
-        lapangan.setStatus(LapanganStatus.DISEWAKAN);
-        lapangan.setUpdatedAt(now);
-        lapanganRepository.save(lapangan);
+        // 5. If batch: confirm all siblings too
+        if (reservasi.getBatchId() != null) {
+            UUID batchId = reservasi.getBatchId();
+            reservasiRepository.findByBatchId(batchId).stream()
+                    .filter(r -> !r.getId().equals(reservasi.getId()))
+                    .forEach(sibling -> {
+                        sibling.setPaymentId(pembayaran.getId());
+                        sibling.setStatus(ReservasiStatus.DIKONFIRMASI);
+                        sibling.setUpdatedAt(now);
+                        reservasiRepository.save(sibling);
+                    });
+        }
 
         log.info("Staff {} confirmed reservation {}", staffId, reservasiId);
 
