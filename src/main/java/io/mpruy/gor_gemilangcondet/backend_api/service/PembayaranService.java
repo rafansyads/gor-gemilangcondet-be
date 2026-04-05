@@ -58,7 +58,6 @@ public class PembayaranService {
     private final PembayaranRepository pembayaranRepository;
     private final ReservasiRepository reservasiRepository;
     private final LapanganRepository lapanganRepository;
-    private final LapanganRepository lapanganRepository;
 
     private static final ZoneId ZONE_JAKARTA = ZoneId.of("Asia/Jakarta");
 
@@ -374,14 +373,6 @@ public class PembayaranService {
             lapanganRepository.save(lapangan);
         }
 
-        // Reset Lapangan to TERSEDIA
-        Lapangan lapangan = reservasi.getLapangan();
-        if (lapangan != null && lapangan.getStatus() != LapanganStatus.TERSEDIA) {
-            lapangan.setStatus(LapanganStatus.TERSEDIA);
-            lapangan.setUpdatedAt(now);
-            lapanganRepository.save(lapangan);
-        }
-
         log.info("Staff {} rejected reservation {}", staffId, reservasiId);
 
         return ConfirmPaymentResponse.builder()
@@ -412,13 +403,6 @@ public class PembayaranService {
             reservasi.setStatus(ReservasiStatus.EXPIRED);
             reservasi.setUpdatedAt(now);
             reservasiRepository.save(reservasi);
-
-            Lapangan lapangan = reservasi.getLapangan();
-            if (lapangan != null && lapangan.getStatus() != LapanganStatus.TERSEDIA) {
-                lapangan.setStatus(LapanganStatus.TERSEDIA);
-                lapangan.setUpdatedAt(now);
-                lapanganRepository.save(lapangan);
-            }
 
             Lapangan lapangan = reservasi.getLapangan();
             if (lapangan != null && lapangan.getStatus() != LapanganStatus.TERSEDIA) {

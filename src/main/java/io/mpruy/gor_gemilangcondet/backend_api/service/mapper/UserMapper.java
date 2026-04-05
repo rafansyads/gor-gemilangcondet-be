@@ -4,8 +4,6 @@ import org.springframework.stereotype.Component;
 
 import io.mpruy.gor_gemilangcondet.backend_api.dto.users.UserDto;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.User;
-import io.mpruy.gor_gemilangcondet.backend_api.entities.users.UserStatus;
-import io.mpruy.gor_gemilangcondet.backend_api.entities.users.UserStatusName;
 
 @Component
 public class UserMapper {
@@ -16,6 +14,7 @@ public class UserMapper {
                 .username(user.getUsername())
                 .email(user.getEmail())
                 .role(user.getRole().getRoleName())
+                .status(user.getStatus() != null ? user.getStatus().getName().name() : null)
                 .membershipStart(user.getMembershipStart())
                 .membershipEnd(user.getMembershipEnd())
                 .build();
@@ -26,12 +25,6 @@ public class UserMapper {
                 .id(userDto.getId())
                 .username(userDto.getUsername())
                 .email(userDto.getEmail())
-                .build();
-    }
-
-    public UserStatus toUserStatusEntity(UserStatusName statusName) {
-        return UserStatus.builder()
-                .name(statusName.name())
                 .build();
     }
 }

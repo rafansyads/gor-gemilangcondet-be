@@ -6,6 +6,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -38,6 +39,11 @@ public class GlobalExceptionHandlerController {
         return ResponseUtil.error(ex.getMessage(), HttpStatus.BAD_REQUEST);
     }
 
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<BaseResponseDto<Object>> handleIllegalStateException(IllegalStateException ex) {
+        return ResponseUtil.error(ex.getMessage(), HttpStatus.BAD_REQUEST);
+    }
+
     @ExceptionHandler(InvalidTokenException.class)
     public ResponseEntity<BaseResponseDto<Object>> handleInvalidToken(InvalidTokenException ex) {
         return ResponseUtil.error(ex.getMessage(), HttpStatus.UNAUTHORIZED);
@@ -56,6 +62,11 @@ public class GlobalExceptionHandlerController {
     @ExceptionHandler(ForbiddenException.class)
     public ResponseEntity<BaseResponseDto<Object>> handleForbidden(ForbiddenException ex) {
         return ResponseUtil.error(ex.getMessage(), HttpStatus.FORBIDDEN);
+    }
+
+    @ExceptionHandler(AuthorizationDeniedException.class)
+    public ResponseEntity<BaseResponseDto<Object>> handleAuthorizationDenied(AuthorizationDeniedException ex) {
+        return ResponseUtil.error("Akses ditolak", HttpStatus.FORBIDDEN);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

@@ -2,12 +2,14 @@ package io.mpruy.gor_gemilangcondet.backend_api.security;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.UUID;
 
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.User;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.users.UserStatusName;
 
 public class UserDetailsImpl implements UserDetails {
 
@@ -53,10 +55,15 @@ public class UserDetailsImpl implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return user.getStatus() != null
+                && UserStatusName.AKTIF.equals(user.getStatus().getName());
     }
 
     public String getStatus() {
-        return user.getStatus().getName();
+        return user.getStatus() != null ? user.getStatus().getName().name() : null;
+    }
+
+    public UUID getId() {
+        return user.getId();
     }
 }

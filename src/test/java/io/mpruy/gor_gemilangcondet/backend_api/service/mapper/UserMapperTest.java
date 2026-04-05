@@ -4,6 +4,8 @@ import io.mpruy.gor_gemilangcondet.backend_api.dto.users.UserDto;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.Role;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.RoleName;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.User;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.users.UserStatus;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.users.UserStatusName;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -22,9 +24,10 @@ class UserMapperTest {
         Role role = new Role();
         role.setId(1);
         role.setRoleName(RoleName.MEMBER);
+        UserStatus status = UserStatus.builder().id(1).name(UserStatusName.AKTIF).build();
         User user = User.builder()
                 .id(userId).username("testuser")
-                .email("test@test.com").password("Pass1234").role(role)
+                .email("test@test.com").password("Pass1234").role(role).status(status)
                 .build();
 
         UserDto result = userMapper.toDto(user);
@@ -33,5 +36,6 @@ class UserMapperTest {
         assertEquals("testuser", result.getUsername());
         assertEquals("test@test.com", result.getEmail());
         assertEquals(RoleName.MEMBER, result.getRole());
+        assertEquals(UserStatusName.AKTIF.name(), result.getStatus());
     }
 }

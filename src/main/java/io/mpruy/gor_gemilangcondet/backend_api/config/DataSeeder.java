@@ -18,9 +18,12 @@ import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.AlatOlahragaStatu
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.BarangType;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.Role;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.RoleName;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.users.UserStatus;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.users.UserStatusName;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.LapanganRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.AlatOlahragaRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.RoleRepository;
+import io.mpruy.gor_gemilangcondet.backend_api.repository.UserStatusRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
@@ -39,12 +42,14 @@ import org.springframework.core.annotation.Order;
 public class DataSeeder implements ApplicationRunner {
 
     private final RoleRepository roleRepository;
+    private final UserStatusRepository userStatusRepository;
     private final LapanganRepository lapanganRepository;
     private final AlatOlahragaRepository alatOlahragaRepository;
     private final EntityManager entityManager;
 
     @Override
     public void run(ApplicationArguments args) {
+        seedUserStatuses();
         seedRoles();
         seedCourts();
         seedLapangan(); // nantinya tergantung GOR
@@ -67,6 +72,15 @@ public class DataSeeder implements ApplicationRunner {
             if (roleRepository.findByRoleName(roleName).isEmpty()) {
                 roleRepository.save(Role.builder().roleName(roleName).build());
                 log.info("Seeded role: {}", roleName);
+            }
+        }
+    }
+
+    private void seedUserStatuses() {
+        for (UserStatusName statusName : UserStatusName.values()) {
+            if (userStatusRepository.findByName(statusName).isEmpty()) {
+                userStatusRepository.save(UserStatus.builder().name(statusName).build());
+                log.info("Seeded user status: {}", statusName);
             }
         }
     }

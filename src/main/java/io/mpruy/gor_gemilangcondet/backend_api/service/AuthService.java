@@ -22,13 +22,16 @@ import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.responses.Reg
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.Role;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.RoleName;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.User;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.users.UserStatus;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.UserStatusName;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.BadRequestException;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.ConflictException;
+import io.mpruy.gor_gemilangcondet.backend_api.exception.ForbiddenException;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.TooManyRequestException;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.UnauthorizedException;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.RoleRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.UserRepository;
+import io.mpruy.gor_gemilangcondet.backend_api.repository.UserStatusRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.security.UserDetailsImpl;
 import io.mpruy.gor_gemilangcondet.backend_api.security.jwt.JwtUtils;
 import io.mpruy.gor_gemilangcondet.backend_api.security.service.JwtTokenBlacklist;
@@ -50,6 +53,7 @@ public class AuthService {
     private final UserMapper userMapper;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
+    private final UserStatusRepository userStatusRepository;
     private final PasswordEncoder passwordEncoder;
     private final LoginAttemptService loginAttemptService;
 
@@ -64,13 +68,11 @@ public class AuthService {
             RoleName.ADMIN);
 
     /**
-     * User status that allows login. Used in the login flow to check
-     * if the user is allowed to log in or not. Only users with status
-     * AKTIF are allowed to log in. Users with status PENDING,
-     * NON_AKTIF, SUSPENDED, or BANNED are not allowed
+     * User status required for successful login. If a user exists with the given
+     * credential but does not have this status, login is denied with a 403
+     * Forbidden
      */
-    private static final Set<String> ALLOWED_LOGIN_STATUSES = Set.of(
-            UserStatusName.AKTIF.name());
+    private static final UserStatusName ACTIVE_STATUS = UserStatusName.AKTIF;
 
     // ──────────────────────────────────────────────────────────────────────────
     // Login
@@ -92,6 +94,8 @@ public class AuthService {
                     "Terlalu banyak percobaan login yang gagal. Silakan coba lagi pada " + lockoutUntil);
         }
 
+        assertLoginStatusAllowed(credential);
+
         Authentication authentication;
         try {
             authentication = authenticationManager.authenticate(
@@ -105,8 +109,8 @@ public class AuthService {
         SecurityContextHolder.getContext().setAuthentication(authentication);
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
 
-        if (!ALLOWED_LOGIN_STATUSES.contains(userDetails.getStatus())) {
-            throw new UnauthorizedException("Akun tidak aktif. Silakan hubungi admin.");
+        if (!ACTIVE_STATUS.name().equals(userDetails.getStatus())) {
+            throw new ForbiddenException("Akun belum aktif atau dibatasi. Silakan hubungi admin.");
         }
 
         String accessToken = jwtUtils.generateAccessToken(userDetails);
@@ -144,7 +148,8 @@ public class AuthService {
     // ──────────────────────────────────────────────────────────────────────────
 
     /**
-     * Self-registration endpoint. Always assigns the {@code GUEST} role.
+     * Self-registration endpoint. Always assigns the {@code GUEST} role and sets
+     * user status to {@code AKTIF}.
      *
      * @param request username + email + password
      * @return {@link RegisterResponse} with the created user and a success message
@@ -155,7 +160,8 @@ public class AuthService {
         validatePassword(request.getPassword());
 
         Role role = requireRole(RoleName.GUEST);
-        User user = buildUser(request, role);
+        UserStatus status = requireUserStatus(UserStatusName.AKTIF);
+        User user = buildUser(request, role, status);
         userRepository.save(user);
 
         return RegisterResponse.builder()
@@ -170,7 +176,8 @@ public class AuthService {
 
     /**
      * Admin-portal registration. {@code request.role} must be one of the
-     * {@link #ADMIN_ASSIGNABLE_ROLES}.
+     * {@link #ADMIN_ASSIGNABLE_ROLES}. Newly created users are marked as
+     * {@code PENDING} until approved by an ADMIN.
      *
      * @param request username + email + password + role name
      * @return {@link RegisterResponse} with the created user and a success message
@@ -182,19 +189,15 @@ public class AuthService {
 
         RoleName roleName = parseAdminRole(request.getRole());
         Role role = requireRole(roleName);
-        User user = buildUser(request, role);
+        UserStatus status = requireUserStatus(UserStatusName.PENDING);
+        User user = buildUser(request, role, status);
         userRepository.save(user);
 
         return RegisterResponse.builder()
                 .user(userMapper.toDto(user))
-                .message("Pengguna " + user.getUsername() + " berhasil dibuat")
+                .message("Pengguna " + user.getUsername() + " berhasil diajukan dan menunggu persetujuan admin")
                 .build();
     }
-
-    // ──────────────────────────────────────────────────────────────────────────
-    // Validate Admin Registration Role (helper for frontend to validate role before
-    // submitting)
-    // ──────────────────────────────────────────────────────────────────────────
 
     // ──────────────────────────────────────────────────────────────────────────
     // Logout
@@ -255,7 +258,7 @@ public class AuthService {
         }
 
         // Set status user menjadi NON_AKTIF dan simpan perubahan ke database
-        user.setStatus(userMapper.toUserStatusEntity(UserStatusName.NON_AKTIF));
+        user.setStatus(requireUserStatus(UserStatusName.NON_AKTIF));
         userRepository.save(user);
 
         // Blacklist token yang digunakan untuk deaktivasi dan hapus refresh token
@@ -297,7 +300,7 @@ public class AuthService {
      * user.
      * 
      * @param request registration request containing the desired username and email
-     * @throws IllegalArgumentException if the username or email is already taken
+     * @throws ConflictException if the username or email is already taken
      */
     private void assertUsernameAndEmailFree(RegisterRequest request) {
         if (userRepository.existsByUsername(request.getUsername())) {
@@ -314,11 +317,38 @@ public class AuthService {
      * 
      * @param name the role name to look up
      * @return the corresponding Role entity
-     * @throws IllegalStateException if the role is not found in the database
+     * @throws BadRequestException if the role is not found in the database
      */
     private Role requireRole(RoleName name) {
         return roleRepository.findByRoleName(name)
-                .orElseThrow(() -> new IllegalStateException("Peran tidak ditemukan di database: " + name));
+                .orElseThrow(() -> new BadRequestException("Peran tidak ditemukan di database: " + name));
+    }
+
+    /**
+     * Fetches a persisted {@link UserStatus} row by enum name.
+     *
+     * @param statusName status enum to load
+     * @return persisted status entity
+     * @throws BadRequestException if status rows are not seeded properly
+     */
+    private UserStatus requireUserStatus(UserStatusName statusName) {
+        return userStatusRepository.findByName(statusName)
+                .orElseThrow(
+                        () -> new BadRequestException("Status pengguna tidak ditemukan di database: " + statusName));
+    }
+
+    /**
+     * If the credential belongs to an existing user, deny login unless status is
+     * AKTIF.
+     */
+    private void assertLoginStatusAllowed(String credential) {
+        userRepository.findByUsername(credential)
+                .or(() -> userRepository.findByEmail(credential))
+                .ifPresent(user -> {
+                    if (user.getStatus() == null || !ACTIVE_STATUS.equals(user.getStatus().getName())) {
+                        throw new ForbiddenException("Akun belum aktif atau dibatasi. Silakan hubungi admin.");
+                    }
+                });
     }
 
     /**
@@ -330,12 +360,13 @@ public class AuthService {
      * @param role    the Role entity to assign to the new user
      * @return a new User entity ready to be saved to the database
      */
-    private User buildUser(RegisterRequest request, Role role) {
+    private User buildUser(RegisterRequest request, Role role, UserStatus status) {
         return User.builder()
                 .username(request.getUsername())
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(role)
+                .status(status)
                 .build();
     }
 
@@ -345,8 +376,8 @@ public class AuthService {
      * and at least one digit.
      *
      * @param password the raw password to validate
-     * @throws IllegalArgumentException if the password does not meet the
-     *                                  requirements
+     * @throws BadRequestException if the password does not meet the
+     *                             requirements
      */
     private void validatePassword(String password) {
         if (password == null || password.length() < 8 || password.length() > 20) {
@@ -375,8 +406,8 @@ public class AuthService {
      * 
      * @param rawRole the raw role name string from the registration request
      * @return the corresponding RoleName enum value if valid
-     * @throws IllegalArgumentException if the role is blank, unknown, or not
-     *                                  allowed for admin registration
+     * @throws BadRequestException if the role is blank, unknown, or not
+     *                             allowed for admin registration
      */
     private RoleName parseAdminRole(String rawRole) {
         if (rawRole == null || rawRole.isBlank()) {

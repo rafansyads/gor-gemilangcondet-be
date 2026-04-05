@@ -8,12 +8,16 @@ import io.mpruy.gor_gemilangcondet.backend_api.dto.authentications.responses.Reg
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.Role;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.RoleName;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.User;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.users.UserStatus;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.users.UserStatusName;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.BadRequestException;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.ConflictException;
+import io.mpruy.gor_gemilangcondet.backend_api.exception.ForbiddenException;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.TooManyRequestException;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.UnauthorizedException;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.RoleRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.UserRepository;
+import io.mpruy.gor_gemilangcondet.backend_api.repository.UserStatusRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.security.UserDetailsImpl;
 import io.mpruy.gor_gemilangcondet.backend_api.security.jwt.JwtUtils;
 import io.mpruy.gor_gemilangcondet.backend_api.security.service.JwtTokenBlacklist;
@@ -67,6 +71,8 @@ class AuthServiceTest {
     @Mock
     private RoleRepository roleRepository;
     @Mock
+    private UserStatusRepository userStatusRepository;
+    @Mock
     private PasswordEncoder passwordEncoder;
     @Mock
     private LoginAttemptService loginAttemptService;
@@ -77,18 +83,32 @@ class AuthServiceTest {
     private User testUser;
     private Role guestRole;
     private UserDetailsImpl userDetails;
+    private UserStatus activeStatus;
+    private UserStatus pendingStatus;
+    private UserStatus nonActiveStatus;
 
     @BeforeEach
     void setUp() {
         guestRole = Role.builder().id(1).roleName(RoleName.GUEST).build();
+        activeStatus = UserStatus.builder().id(1).name(UserStatusName.AKTIF).build();
+        pendingStatus = UserStatus.builder().id(2).name(UserStatusName.PENDING).build();
+        nonActiveStatus = UserStatus.builder().id(3).name(UserStatusName.NON_AKTIF).build();
         testUser = User.builder()
                 .id(UUID.randomUUID())
                 .username("testuser")
                 .email("test@example.com")
                 .password("encodedPassword")
                 .role(guestRole)
+                .status(activeStatus)
                 .build();
         userDetails = new UserDetailsImpl(testUser);
+
+        lenient().when(userRepository.findByUsername(anyString())).thenReturn(Optional.empty());
+        lenient().when(userRepository.findByEmail(anyString())).thenReturn(Optional.empty());
+        lenient().when(userStatusRepository.findByName(UserStatusName.AKTIF)).thenReturn(Optional.of(activeStatus));
+        lenient().when(userStatusRepository.findByName(UserStatusName.PENDING)).thenReturn(Optional.of(pendingStatus));
+        lenient().when(userStatusRepository.findByName(UserStatusName.NON_AKTIF))
+                .thenReturn(Optional.of(nonActiveStatus));
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -164,6 +184,28 @@ class AuthServiceTest {
 
             assertThrows(BadCredentialsException.class, () -> authService.login(request, null));
         }
+
+        @Test
+        @DisplayName("Should reject pending user login with forbidden")
+        void login_PendingUser_Forbidden() {
+            LoginRequest request = new LoginRequest();
+            request.setUsernameOrEmail("pendinguser");
+            request.setPassword("Password1");
+
+            User pendingUser = User.builder()
+                    .id(UUID.randomUUID())
+                    .username("pendinguser")
+                    .email("pending@example.com")
+                    .password("encoded")
+                    .role(guestRole)
+                    .status(pendingStatus)
+                    .build();
+
+            when(userRepository.findByUsername("pendinguser")).thenReturn(Optional.of(pendingUser));
+
+            assertThrows(ForbiddenException.class, () -> authService.login(request, null));
+            verify(authenticationManager, never()).authenticate(any());
+        }
     }
 
     // ══════════════════════════════════════════════════════════════════════════
@@ -180,7 +222,7 @@ class AuthServiceTest {
             Role adminRole = Role.builder().id(6).roleName(RoleName.ADMIN).build();
             User adminUser = User.builder()
                     .id(UUID.randomUUID()).username("admin1").email("admin@test.com")
-                    .password("enc").role(adminRole).build();
+                    .password("enc").role(adminRole).status(activeStatus).build();
             UserDetailsImpl adminDetails = new UserDetailsImpl(adminUser);
 
             LoginRequest request = new LoginRequest();
@@ -209,7 +251,7 @@ class AuthServiceTest {
             Role stafRole = Role.builder().id(3).roleName(RoleName.STAF_LAPANGAN).build();
             User stafUser = User.builder()
                     .id(UUID.randomUUID()).username("staf1").email("staf@test.com")
-                    .password("enc").role(stafRole).build();
+                    .password("enc").role(stafRole).status(activeStatus).build();
             UserDetailsImpl stafDetails = new UserDetailsImpl(stafUser);
 
             LoginRequest request = new LoginRequest();
@@ -258,7 +300,7 @@ class AuthServiceTest {
             Role memberRole = Role.builder().id(2).roleName(RoleName.MEMBER).build();
             User memberUser = User.builder()
                     .id(UUID.randomUUID()).username("member1").email("m@test.com")
-                    .password("enc").role(memberRole).build();
+                    .password("enc").role(memberRole).status(activeStatus).build();
             UserDetailsImpl memberDetails = new UserDetailsImpl(memberUser);
 
             LoginRequest request = new LoginRequest();
@@ -310,6 +352,27 @@ class AuthServiceTest {
 
             assertNotNull(result);
             verify(userRepository).save(any(User.class));
+        }
+
+        @Test
+        @DisplayName("Should set AKTIF status for public registration")
+        void register_ShouldSetAktifStatus() {
+            RegisterRequest request = new RegisterRequest();
+            request.setUsername("newuser");
+            request.setEmail("new@example.com");
+            request.setPassword("Password1");
+
+            when(userRepository.existsByUsername("newuser")).thenReturn(false);
+            when(userRepository.existsByEmail("new@example.com")).thenReturn(false);
+            when(roleRepository.findByRoleName(RoleName.GUEST)).thenReturn(Optional.of(guestRole));
+            when(passwordEncoder.encode("Password1")).thenReturn("encoded");
+            when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
+            when(userMapper.toDto(any(User.class))).thenReturn(null);
+
+            authService.register(request);
+
+            verify(userRepository).save(argThat(
+                    user -> user.getStatus() != null && UserStatusName.AKTIF.equals(user.getStatus().getName())));
         }
 
         @Test
@@ -485,6 +548,30 @@ class AuthServiceTest {
 
             RegisterResponse result = authService.registerAdmin(request);
             assertNotNull(result);
+        }
+
+        @Test
+        @DisplayName("Should set PENDING status for admin registration")
+        void registerAdmin_ShouldSetPendingStatus() {
+            RegisterRequest request = new RegisterRequest();
+            request.setUsername("staf1");
+            request.setEmail("staf@example.com");
+            request.setPassword("Password1");
+            request.setRole("STAF_LAPANGAN");
+
+            Role stafRole = Role.builder().id(3).roleName(RoleName.STAF_LAPANGAN).build();
+
+            when(userRepository.existsByUsername("staf1")).thenReturn(false);
+            when(userRepository.existsByEmail("staf@example.com")).thenReturn(false);
+            when(roleRepository.findByRoleName(RoleName.STAF_LAPANGAN)).thenReturn(Optional.of(stafRole));
+            when(passwordEncoder.encode("Password1")).thenReturn("encoded");
+            when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
+            when(userMapper.toDto(any(User.class))).thenReturn(null);
+
+            authService.registerAdmin(request);
+
+            verify(userRepository).save(argThat(
+                    user -> user.getStatus() != null && UserStatusName.PENDING.equals(user.getStatus().getName())));
         }
 
         @Test

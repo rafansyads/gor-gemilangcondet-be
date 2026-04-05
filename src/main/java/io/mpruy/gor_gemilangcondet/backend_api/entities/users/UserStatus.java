@@ -11,11 +11,12 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class UserStatus {
-    
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
+    @Enumerated(EnumType.STRING)
     @Column(unique = true, nullable = false)
-    private String name;
+    private UserStatusName name;
 }

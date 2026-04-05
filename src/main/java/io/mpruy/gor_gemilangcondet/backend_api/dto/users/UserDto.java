@@ -15,6 +15,7 @@ public class UserDto {
     private String username;
     private String email;
     private RoleName role;
+    private String status;
     private LocalDateTime membershipStart;
     private LocalDateTime membershipEnd;
 }
