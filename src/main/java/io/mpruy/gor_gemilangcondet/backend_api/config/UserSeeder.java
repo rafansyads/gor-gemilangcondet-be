@@ -3,8 +3,12 @@ package io.mpruy.gor_gemilangcondet.backend_api.config;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.Role;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.RoleName;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.User;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.users.UserStatus;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.users.UserStatusName;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.RoleRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.UserRepository;
+import io.mpruy.gor_gemilangcondet.backend_api.repository.UserStatusRepository;
+import io.mpruy.gor_gemilangcondet.backend_api.exception.BadRequestException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -32,6 +36,7 @@ public class UserSeeder implements CommandLineRunner {
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
+    private final UserStatusRepository userStatusRepository;
     private final PasswordEncoder passwordEncoder;
 
     private record DummyUser(String username, String email, String password, RoleName role) {
@@ -74,6 +79,11 @@ public class UserSeeder implements CommandLineRunner {
     public void run(String... args) {
         log.info("=== [DEV] Starting dummy user seeding ===");
 
+        UserStatus activeStatus = userStatusRepository.findByName(UserStatusName.AKTIF)
+                .orElseThrow(() -> new BadRequestException(
+                        "Status tidak ditemukan: " + UserStatusName.AKTIF
+                                + ". Pastikan DataSeeder dijalankan terlebih dahulu."));
+
         int created = 0;
         for (DummyUser dummy : DUMMY_USERS) {
             if (userRepository.existsByEmail(dummy.email())) {
@@ -82,7 +92,7 @@ public class UserSeeder implements CommandLineRunner {
             }
 
             Role role = roleRepository.findByRoleName(dummy.role())
-                    .orElseThrow(() -> new IllegalStateException(
+                    .orElseThrow(() -> new BadRequestException(
                             "Peran tidak ditemukan: " + dummy.role()
                                     + ". Pastikan DataSeeder dijalankan terlebih dahulu."));
 
@@ -91,6 +101,7 @@ public class UserSeeder implements CommandLineRunner {
                     .email(dummy.email())
                     .password(passwordEncoder.encode(dummy.password()))
                     .role(role)
+                    .status(activeStatus)
                     .build();
 
             userRepository.save(user);

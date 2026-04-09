@@ -6,9 +6,12 @@ import io.mpruy.gor_gemilangcondet.backend_api.dto.users.responses.UpdateProfile
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.Role;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.RoleName;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.User;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.users.UserStatus;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.users.UserStatusName;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.ConflictException;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.ResourceNotFoundException;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.UserRepository;
+import io.mpruy.gor_gemilangcondet.backend_api.repository.UserStatusRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.security.UserDetailsImpl;
 import io.mpruy.gor_gemilangcondet.backend_api.security.jwt.JwtUtils;
 import io.mpruy.gor_gemilangcondet.backend_api.security.service.RefreshTokenService;
@@ -30,6 +33,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,6 +41,9 @@ class UserServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private UserStatusRepository userStatusRepository;
 
     @Mock
     private JwtUtils jwtUtils;
@@ -50,17 +57,22 @@ class UserServiceTest {
     private User testUser;
     private UUID userId;
     private Role guestRole;
+    private UserStatus activeStatus;
+    private UserStatus pendingStatus;
 
     @BeforeEach
     void setUp() {
         userId = UUID.randomUUID();
         guestRole = Role.builder().id(1).roleName(RoleName.GUEST).build();
+        activeStatus = UserStatus.builder().id(1).name(UserStatusName.AKTIF).build();
+        pendingStatus = UserStatus.builder().id(2).name(UserStatusName.PENDING).build();
         testUser = User.builder()
                 .id(userId)
                 .username("testuser")
                 .email("test@example.com")
                 .password("encoded")
                 .role(guestRole)
+            .status(activeStatus)
                 .build();
     }
 
@@ -77,7 +89,7 @@ class UserServiceTest {
         void getAllUsers_Success() {
             User user2 = User.builder()
                     .id(UUID.randomUUID()).username("user2").email("u2@test.com")
-                    .password("enc").role(guestRole).build();
+                    .password("enc").role(guestRole).status(activeStatus).build();
 
             when(userRepository.findAll()).thenReturn(List.of(testUser, user2));
 
@@ -117,6 +129,7 @@ class UserServiceTest {
             assertEquals("testuser", result.getUsername());
             assertEquals("test@example.com", result.getEmail());
             assertEquals(RoleName.GUEST, result.getRole());
+            assertEquals(UserStatusName.AKTIF.name(), result.getStatus());
         }
 
         @Test
@@ -128,6 +141,97 @@ class UserServiceTest {
             assertThrows(ResourceNotFoundException.class, () -> userService.getUserById(randomId));
         }
     }
+
+        // ══════════════════════════════════════════════════════════════════════════
+        // PENDING ADMIN REGISTRATION REVIEW
+        // ══════════════════════════════════════════════════════════════════════════
+
+        @Nested
+        @DisplayName("Pending Admin Registration Tests")
+        class PendingAdminRegistrationTests {
+
+        @Test
+        @DisplayName("Should return pending admin/staff registrations")
+        void getPendingAdminRegistrations_Success() {
+            User pendingStaff = User.builder()
+                .id(UUID.randomUUID())
+                .username("staf_pending")
+                .email("staf_pending@test.com")
+                .password("encoded")
+                .role(Role.builder().id(3).roleName(RoleName.STAF_LAPANGAN).build())
+                .status(pendingStatus)
+                .build();
+
+            when(userRepository.findByStatus_NameAndRole_RoleNameIn(
+                    eq(UserStatusName.PENDING), anyCollection()))
+                .thenReturn(List.of(pendingStaff));
+
+            List<UserDto> result = userService.getPendingAdminRegistrations();
+
+            assertEquals(1, result.size());
+            assertEquals("staf_pending", result.get(0).getUsername());
+            assertEquals(UserStatusName.PENDING.name(), result.get(0).getStatus());
+        }
+
+        @Test
+        @DisplayName("Should approve pending admin/staff registration")
+        void approvePendingAdminRegistration_Success() {
+            UUID pendingId = UUID.randomUUID();
+            User pendingStaff = User.builder()
+                .id(pendingId)
+                .username("staf_pending")
+                .email("staf_pending@test.com")
+                .password("encoded")
+                .role(Role.builder().id(3).roleName(RoleName.STAF_LAPANGAN).build())
+                .status(pendingStatus)
+                .build();
+
+            when(userRepository.findByIdAndStatus_NameAndRole_RoleNameIn(
+                    eq(pendingId), eq(UserStatusName.PENDING), anyCollection()))
+                .thenReturn(Optional.of(pendingStaff));
+                when(userStatusRepository.findByName(UserStatusName.AKTIF)).thenReturn(Optional.of(activeStatus));
+            when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
+
+            UserDto result = userService.approvePendingAdminRegistration(pendingId);
+
+            assertEquals(UserStatusName.AKTIF.name(), result.getStatus());
+        }
+
+        @Test
+        @DisplayName("Should reject pending admin/staff registration")
+        void rejectPendingAdminRegistration_Success() {
+            UUID pendingId = UUID.randomUUID();
+            User pendingStaff = User.builder()
+                .id(pendingId)
+                .username("staf_pending")
+                .email("staf_pending@test.com")
+                .password("encoded")
+                .role(Role.builder().id(3).roleName(RoleName.STAF_LAPANGAN).build())
+                .status(pendingStatus)
+                .build();
+
+            when(userRepository.findByIdAndStatus_NameAndRole_RoleNameIn(
+                    eq(pendingId), eq(UserStatusName.PENDING), anyCollection()))
+                .thenReturn(Optional.of(pendingStaff));
+
+            userService.rejectPendingAdminRegistration(pendingId);
+
+            verify(userRepository).delete(pendingStaff);
+        }
+
+        @Test
+        @DisplayName("Should throw when approving non-existing pending registration")
+        void approvePendingAdminRegistration_NotFound() {
+            UUID pendingId = UUID.randomUUID();
+
+            when(userRepository.findByIdAndStatus_NameAndRole_RoleNameIn(
+                    eq(pendingId), eq(UserStatusName.PENDING), anyCollection()))
+                .thenReturn(Optional.empty());
+
+            assertThrows(ResourceNotFoundException.class,
+                () -> userService.approvePendingAdminRegistration(pendingId));
+        }
+        }
 
     // ══════════════════════════════════════════════════════════════════════════
     // GET USER BY USERNAME

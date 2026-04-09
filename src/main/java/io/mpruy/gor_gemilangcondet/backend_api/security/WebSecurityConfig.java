@@ -36,9 +36,8 @@ public class WebSecurityConfig {
     /**
      * Main security filter chain.
      * <p>
-     * Current policy: all endpoints ({@code /**}) are permitted without
-     * authentication.
-     * RBAC rules will be added incrementally once controllers are implemented.
+     * Public routes are explicitly permitted, while all remaining routes require
+     * authentication. Fine-grained role checks are enforced via method security.
      */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -51,31 +50,21 @@ public class WebSecurityConfig {
                         // Always allow preflight requests
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // Auth controller: allow all (login and register are public)
-                        .requestMatchers("/auth/**").permitAll()
+                        // Authentication routes -- publik
+                        .requestMatchers("/auth/**", "/api/auth/**").permitAll()
 
                         // Schedule & WebSocket — publik
-                        .requestMatchers("/api/schedule/**").permitAll()
-                        .requestMatchers("/api/test/**").permitAll()
-                        .requestMatchers("/ws/**").permitAll()
+                        .requestMatchers("/schedule/**", "/api/schedule/**").permitAll()
+                        .requestMatchers("/test/**", "/api/test/**").permitAll()
+                        .requestMatchers("/ws/**", "/api/ws/**").permitAll()
 
                         // Static files & H2 console (dev)
-                        .requestMatchers("/", "/test-schedule.html", "/*.html", "/**.html").permitAll()
-                        .requestMatchers("/h2-console/**").permitAll()
+                        .requestMatchers("/", "/api", "/test-schedule.html", "/api/test-schedule.html", "/*.html",
+                                "/**.html")
+                        .permitAll()
+                        .requestMatchers("/h2-console/**", "/api/h2-console/**").permitAll()
 
-                        // TODO: narrow down once RBAC is defined per endpoint
-                        .requestMatchers("/**").permitAll() // temporary, to be replaced with actual RBAC rules
-
-                // // User controller: limit GET /users and /users/by-username/** to ADMIN,
-                // STAF_LAPANGAN, and STAF_TOKO
-                // // GET /users/{id} can be accessed by the user themselves or by staff/admin
-                // .requestMatchers(HttpMethod.GET, "/users", "/users/by-username/**")
-                // .hasAnyAuthority("ADMIN", "STAF_LAPANGAN", "STAF_TOKO")
-                // .requestMatchers(HttpMethod.GET, "/users/**")// custom logic in controller to
-                // check if user is accessing their own data or is staff/admin
-                // .hasAnyAuthority("ADMIN", "STAF_LAPANGAN", "STAF_TOKO", "MEMBER", "GUEST",
-                // "OWNER")
-                )
+                        .anyRequest().authenticated())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider)
                 .addFilterBefore(jwtTokenFilter, UsernamePasswordAuthenticationFilter.class)

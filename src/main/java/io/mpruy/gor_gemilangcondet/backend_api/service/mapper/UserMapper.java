@@ -14,8 +14,17 @@ public class UserMapper {
                 .username(user.getUsername())
                 .email(user.getEmail())
                 .role(user.getRole().getRoleName())
+                .status(user.getStatus() != null ? user.getStatus().getName().name() : null)
                 .membershipStart(user.getMembershipStart())
                 .membershipEnd(user.getMembershipEnd())
+                .build();
+    }
+
+    public User toEntity(UserDto userDto) {
+        return User.builder()
+                .id(userDto.getId())
+                .username(userDto.getUsername())
+                .email(userDto.getEmail())
                 .build();
     }
 }

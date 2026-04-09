@@ -14,8 +14,11 @@ import io.mpruy.gor_gemilangcondet.backend_api.entities.payment.PaymentType;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.payment.Pembayaran;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.Lapangan;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.LapanganStatus;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.Lapangan;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.LapanganStatus;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.Reservasi;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.ReservasiStatus;
+import io.mpruy.gor_gemilangcondet.backend_api.repository.LapanganRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.LapanganRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.PembayaranRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.ReservasiRepository;
@@ -152,8 +155,8 @@ public class PembayaranService {
                     .slots(slots)
                     .build();
         })
-        .sorted(Comparator.comparing(InvoiceResponse::getCreatedAt).reversed())
-        .collect(Collectors.toList());
+                .sorted(Comparator.comparing(InvoiceResponse::getCreatedAt).reversed())
+                .collect(Collectors.toList());
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -223,7 +226,8 @@ public class PembayaranService {
         reservasi.setUpdatedAt(now);
         reservasiRepository.save(reservasi);
 
-        // 7. If this reservation is part of a batch, propagate proof + status to siblings
+        // 7. If this reservation is part of a batch, propagate proof + status to
+        // siblings
         if (reservasi.getBatchId() != null) {
             reservasiRepository.findByBatchId(reservasi.getBatchId()).stream()
                     .filter(r -> !r.getId().equals(reservasi.getId()))
@@ -318,8 +322,6 @@ public class PembayaranService {
                         reservasiRepository.save(sibling);
                     });
         }
-
-
 
         log.info("Staff {} confirmed reservation {}", staffId, reservasiId);
 

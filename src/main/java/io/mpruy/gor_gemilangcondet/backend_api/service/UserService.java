@@ -3,10 +3,15 @@ package io.mpruy.gor_gemilangcondet.backend_api.service;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.users.UserDto;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.users.requests.UpdateProfileRequest;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.users.responses.UpdateProfileResponse;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.users.RoleName;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.User;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.users.UserStatus;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.users.UserStatusName;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.ConflictException;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.ResourceNotFoundException;
+import io.mpruy.gor_gemilangcondet.backend_api.exception.BadRequestException;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.UserRepository;
+import io.mpruy.gor_gemilangcondet.backend_api.repository.UserStatusRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.security.UserDetailsImpl;
 import io.mpruy.gor_gemilangcondet.backend_api.security.jwt.JwtUtils;
 import io.mpruy.gor_gemilangcondet.backend_api.security.service.RefreshTokenService;
@@ -18,16 +23,23 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class UserService {
 
     private final UserRepository userRepository;
+    private final UserStatusRepository userStatusRepository;
     private final JwtUtils jwtUtils;
     private final RefreshTokenService refreshTokenService;
+
+    private static final Set<RoleName> ADMIN_ASSIGNABLE_ROLES = Set.of(
+            RoleName.STAF_LAPANGAN,
+            RoleName.STAF_TOKO,
+            RoleName.OWNER,
+            RoleName.ADMIN);
 
     // ──────────────────────────────────────────────────────────────────────────
     // Queries
@@ -37,7 +49,7 @@ public class UserService {
     public List<UserDto> getAllUsers() {
         return userRepository.findAll().stream()
                 .map(this::toDto)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -52,6 +64,34 @@ public class UserService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("Pengguna tidak ditemukan: " + username));
         return toDto(user);
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Pending Admin/Staff Registrations (admin review: register-admin)
+    // ──────────────────────────────────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public List<UserDto> getPendingAdminRegistrations() {
+        return userRepository.findByStatus_NameAndRole_RoleNameIn(
+                UserStatusName.PENDING,
+                ADMIN_ASSIGNABLE_ROLES)
+                .stream()
+                .map(this::toDto)
+                .toList();
+    }
+
+    @Transactional
+    public UserDto approvePendingAdminRegistration(UUID id) {
+        User pendingUser = findPendingAdminUser(id);
+        pendingUser.setStatus(requireUserStatus(UserStatusName.AKTIF));
+        User saved = userRepository.save(pendingUser);
+        return toDto(saved);
+    }
+
+    @Transactional
+    public void rejectPendingAdminRegistration(UUID id) {
+        User pendingUser = findPendingAdminUser(id);
+        userRepository.delete(pendingUser);
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -73,7 +113,20 @@ public class UserService {
     @Transactional
     public UpdateProfileResponse updateProfile(UpdateProfileRequest request) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (request.getUsername() == null || request.getEmail() == null) {
+            throw new BadRequestException("Username dan email tidak boleh kosong");
+        }
+
+        if (authentication == null || !(authentication.getPrincipal() instanceof UserDetailsImpl)) {
+            throw new BadRequestException("Tidak ada pengguna yang terautentikasi");
+        }
+
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+
+        if (userDetails == null) {
+            throw new BadRequestException("Tidak ada pengguna yang terautentikasi");
+        }
+
         User currentUser = userDetails.getUser();
         String oldUsername = currentUser.getUsername();
 
@@ -83,10 +136,11 @@ public class UserService {
 
         // Check uniqueness — exclude the current user's own ID
         if (userRepository.existsByUsernameAndIdNot(request.getUsername(), user.getId())) {
-            throw new ConflictException("Username is already taken: " + request.getUsername());
+            throw new ConflictException("Username sudah digunakan: " + request.getUsername());
         }
+
         if (userRepository.existsByEmailAndIdNot(request.getEmail(), user.getId())) {
-            throw new ConflictException("Email is already registered: " + request.getEmail());
+            throw new ConflictException("Email sudah terdaftar: " + request.getEmail());
         }
 
         user.setUsername(request.getUsername());
@@ -99,13 +153,15 @@ public class UserService {
         // Issue fresh tokens with the new username
         String newAccessToken = jwtUtils.generateAccessToken(newUserDetails);
 
-        // Rotate refresh token: revoke old username's token, create one for new username
+        // Rotate refresh token: revoke old username's token, create one for new
+        // username
         refreshTokenService.deleteRefreshTokenByUsername(oldUsername);
         String newRefreshToken = refreshTokenService.createRefreshToken(updated.getUsername());
 
-        // Update SecurityContext so subsequent filters/code in this request see the new principal
-        UsernamePasswordAuthenticationToken newAuth =
-                new UsernamePasswordAuthenticationToken(newUserDetails, null, newUserDetails.getAuthorities());
+        // Update SecurityContext so subsequent filters/code in this request see the new
+        // principal
+        UsernamePasswordAuthenticationToken newAuth = new UsernamePasswordAuthenticationToken(newUserDetails, null,
+                newUserDetails.getAuthorities());
         SecurityContextHolder.getContext().setAuthentication(newAuth);
 
         return UpdateProfileResponse.builder()
@@ -125,8 +181,28 @@ public class UserService {
                 .username(user.getUsername())
                 .email(user.getEmail())
                 .role(user.getRole().getRoleName())
+                .status(user.getStatus() != null ? user.getStatus().getName().name() : null)
                 .membershipStart(user.getMembershipStart())
                 .membershipEnd(user.getMembershipEnd())
                 .build();
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Helpers
+    // ──────────────────────────────────────────────────────────────────────────
+
+    private User findPendingAdminUser(UUID id) {
+        return userRepository.findByIdAndStatus_NameAndRole_RoleNameIn(
+                id,
+                UserStatusName.PENDING,
+                ADMIN_ASSIGNABLE_ROLES)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Pengguna pending admin/staff tidak ditemukan: " + id));
+    }
+
+    private UserStatus requireUserStatus(UserStatusName statusName) {
+        return userStatusRepository.findByName(statusName)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Status pengguna tidak ditemukan di database: " + statusName));
     }
 }
