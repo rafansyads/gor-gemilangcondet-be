@@ -338,10 +338,6 @@ public class ReservasiService {
         // Reschedule Reservation
         // ──────────────────────────────────────────────────────────────────────────
 
-        /**
-         * Reschedules an existing reservation to a new time slot.
-         * Applies the same validation and atomic locking as creation.
-         */
         @Transactional
         public ReservasiResponse rescheduleReservation(UUID reservasiId, RescheduleReservasiRequest request) {
                 LocalDateTime now = LocalDateTime.now(ZONE_JAKARTA);
@@ -378,16 +374,42 @@ public class ReservasiService {
                                                         CLOSING_HOUR));
                 }
 
-                // 6. Lock the court
-                Lapangan lapangan = lapanganRepository.findByIdWithPessimisticLock(
-                                reservasi.getLapangan().getId())
+                // 6. Determine target court (new or existing)
+                UUID targetLapanganId = (request.getNewLapanganId() != null)
+                                ? request.getNewLapanganId()
+                                : reservasi.getLapangan().getId();
+
+                // 7. Lock the target court
+                Lapangan lapangan = lapanganRepository.findByIdWithPessimisticLock(targetLapanganId)
                                 .orElseThrow(() -> new ResourceNotFoundException("Lapangan tidak ditemukan"));
 
-                // 7. Calculate new end time
+                // 8. Validate court is available (not under maintenance)
+                if (lapangan.getStatus() == LapanganStatus.DALAM_PERBAIKAN) {
+                        throw new BadRequestException(
+                                        "Lapangan sedang dalam perbaikan dan tidak dapat digunakan");
+                }
+
+                // 9. Validate the new court has the same type as the original
+                if (lapangan.getType() != reservasi.getLapangan().getType()) {
+                        throw new BadRequestException(
+                                        "Lapangan baru harus memiliki tipe yang sama dengan reservasi awal (" +
+                                        reservasi.getLapangan().getType() + ")");
+                }
+
+                // 10. Calculate new end time
                 LocalDateTime newEnd = request.getNewReservationStart()
                                 .plusHours(request.getDurationInHours());
 
-                // 8. Check for overlapping reservations (exclude current reservation)
+                // 11. Check maintenance window on new court
+                if (lapangan.getMaintenanceStart() != null && lapangan.getMaintenanceEnd() != null) {
+                        if (lapangan.getMaintenanceStart().isBefore(newEnd) &&
+                                        lapangan.getMaintenanceEnd().isAfter(request.getNewReservationStart())) {
+                                throw new BadRequestException(
+                                                "Lapangan sedang dalam perbaikan pada waktu yang dipilih");
+                        }
+                }
+
+                // 12. Check for overlapping reservations (exclude current reservation)
                 List<Reservasi> overlapping = reservasiRepository.findOverlappingReservations(
                                 lapangan.getId(), request.getNewReservationStart(), newEnd, INACTIVE_STATUSES);
                 overlapping.removeIf(r -> r.getId().equals(reservasiId));
@@ -396,12 +418,13 @@ public class ReservasiService {
                         throw new BadRequestException("Jadwal lapangan sudah terisi pada waktu baru yang dipilih");
                 }
 
-                // 9. Recalculate cost
+                // 13. Recalculate cost based on target court
                 double courtCost = lapangan.getTarifPerJam() * request.getDurationInHours();
                 double equipmentCost = calculateExistingEquipmentCost(reservasi.getRentList());
                 double totalCost = courtCost + equipmentCost;
 
-                // 10. Update reservation
+                // 14. Update reservation
+                reservasi.setLapangan(lapangan);
                 reservasi.setReservationStart(request.getNewReservationStart());
                 reservasi.setReservationEnd(newEnd);
                 reservasi.setTotalPayment(totalCost);
@@ -410,6 +433,146 @@ public class ReservasiService {
                 reservasiRepository.save(reservasi);
 
                 return toReservasiResponse(reservasi);
+        }
+
+        /**
+         * Reschedules an entire batch of reservations by re-allocating them into 1-hour slots.
+         * This allows splitting a 2-hour contiguous block into separate 1-hour slots.
+         */
+        @Transactional
+        public BatchReservasiResponse rescheduleBatch(UUID batchId, RescheduleBatchRequest request) {
+                LocalDateTime now = LocalDateTime.now(ZONE_JAKARTA);
+
+                // 1. Get all reservations belonging to this batch
+                List<Reservasi> batchReservations = reservasiRepository.findByBatchId(batchId);
+                if (batchReservations.isEmpty()) {
+                        throw new ResourceNotFoundException("Batch reservasi tidak ditemukan: " + batchId);
+                }
+
+                // 2. Calculate total Duration (to ensure parity)
+                int totalOldDuration = batchReservations.stream()
+                                .mapToInt(r -> (int) ChronoUnit.HOURS.between(r.getReservationStart(), r.getReservationEnd()))
+                                .sum();
+
+                if (request.getNewStarts().size() != totalOldDuration) {
+                        throw new BadRequestException("Jumlah jam baru (" + request.getNewStarts().size() + 
+                                        ") harus sama dengan jumlah jam pesanan awal (" + totalOldDuration + ")");
+                }
+
+                // 3. Prepare common context from the primary (first) reservation
+                Reservasi primary = batchReservations.get(0);
+                UUID userId = primary.getUserId();
+                UUID paymentId = primary.getPaymentId();
+                String namaWakil = primary.getNamaWakil();
+                String nomorTelepon = primary.getNomorTelepon();
+                int jumlahOrang = primary.getJumlahOrang();
+                ReservasiStatus status = primary.getStatus();
+                LocalDateTime paymentDeadline = primary.getPaymentDeadline();
+                String paymentProofUrl = primary.getPaymentProofUrl();
+                
+                // Aggregate ALL rent items from the entire old batch
+                List<UUID> allOldRentItems = batchReservations.stream()
+                                .filter(r -> r.getRentList() != null)
+                                .flatMap(r -> r.getRentList().stream())
+                                .collect(Collectors.toList());
+
+                // 4. Validate court and lock
+                UUID targetCourtId = (request.getNewLapanganId() != null)
+                                ? request.getNewLapanganId()
+                                : primary.getLapangan().getId();
+
+                Lapangan targetLapangan = lapanganRepository.findByIdWithPessimisticLock(targetCourtId)
+                                .orElseThrow(() -> new ResourceNotFoundException("Lapangan tidak ditemukan: " + targetCourtId));
+
+                if (targetLapangan.getStatus() == LapanganStatus.DALAM_PERBAIKAN) {
+                        throw new BadRequestException("Lapangan '" + targetLapangan.getName() + "' sedang dalam perbaikan");
+                }
+                if (targetLapangan.getType() != primary.getLapangan().getType()) {
+                        throw new BadRequestException("Tipe lapangan tidak kompatibel");
+                }
+
+                // 5. Validation and overlap check for EACH new 1-hour slot
+                for (LocalDateTime newStart : request.getNewStarts()) {
+                        if (newStart.isBefore(now)) {
+                                throw new BadRequestException("Waktu mulai baru tidak boleh di masa lalu: " + newStart);
+                        }
+                        if (newStart.getMinute() != 0) {
+                                throw new BadRequestException("Waktu harus pada jam tepat: " + newStart);
+                        }
+                        int h = newStart.getHour();
+                        if (h < OPENING_HOUR || h >= CLOSING_HOUR) {
+                                throw new BadRequestException("Di luar jam operasional GOR: " + newStart);
+                        }
+
+                        // Overlap (excluding the current batch)
+                        List<Reservasi> overlapping = reservasiRepository.findOverlappingReservations(
+                                        targetCourtId, newStart, newStart.plusHours(1), INACTIVE_STATUSES);
+                        overlapping.removeIf(r -> batchId.equals(r.getBatchId()));
+                        if (!overlapping.isEmpty()) {
+                                throw new BadRequestException("Slot jam " + h + ":00 sudah terisi.");
+                        }
+                }
+
+                // Internal overlap check within the request (e.g. duplicate start times)
+                long uniqueStarts = request.getNewStarts().stream().distinct().count();
+                if (uniqueStarts != request.getNewStarts().size()) {
+                        throw new BadRequestException("Ada slot jam yang duplikat dalam pilihan baru Anda.");
+                }
+
+                // 6. DELETE old reservations and CREATE new 1-hour entities
+                reservasiRepository.deleteAll(batchReservations);
+
+                List<ReservasiResponse> updatedResponses = new ArrayList<>();
+                double totalBatchCost = 0;
+                List<UUID> remainingRentItems = new ArrayList<>(allOldRentItems);
+
+                for (int i = 0; i < request.getNewStarts().size(); i++) {
+                        LocalDateTime newStart = request.getNewStarts().get(i);
+                        double courtCost = targetLapangan.getTarifPerJam();
+                        
+                        // Distribute one item to each slot until we run out
+                        List<UUID> currentRentList = new ArrayList<>();
+                        if (!remainingRentItems.isEmpty()) {
+                                currentRentList.add(remainingRentItems.remove(0));
+                        }
+                        
+                        // Special case: if this is the LAST slot but we still have many items left,
+                        // put all remaining items here to ensure no data loss.
+                        if (i == (request.getNewStarts().size() - 1) && !remainingRentItems.isEmpty()) {
+                                currentRentList.addAll(remainingRentItems);
+                                remainingRentItems.clear();
+                        }
+
+                        Reservasi newRes = Reservasi.builder()
+                                        .userId(userId)
+                                        .paymentId(paymentId)
+                                        .batchId(batchId)
+                                        .lapangan(targetLapangan)
+                                        .reservationStart(newStart)
+                                        .reservationEnd(newStart.plusHours(1))
+                                        .status(status)
+                                        .namaWakil(namaWakil)
+                                        .nomorTelepon(nomorTelepon)
+                                        .jumlahOrang(jumlahOrang)
+                                        .paymentProofUrl(paymentProofUrl)
+                                        .totalPayment(courtCost + calculateExistingEquipmentCost(currentRentList))
+                                        .rentList(currentRentList)
+                                        .paymentDeadline(paymentDeadline)
+                                        .createdAt(primary.getCreatedAt())
+                                        .updatedAt(now)
+                                        .build();
+
+                        reservasiRepository.save(newRes);
+                        updatedResponses.add(toReservasiResponse(newRes));
+                        totalBatchCost += newRes.getTotalPayment();
+                }
+
+                return BatchReservasiResponse.builder()
+                                .batchId(batchId)
+                                .reservations(updatedResponses)
+                                .totalPayment(totalBatchCost)
+                                .primaryReservationId(updatedResponses.get(0).getId())
+                                .build();
         }
 
         // ──────────────────────────────────────────────────────────────────────────
