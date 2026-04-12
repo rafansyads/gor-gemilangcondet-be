@@ -18,9 +18,12 @@ import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.AlatOlahragaStatu
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.BarangType;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.Role;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.RoleName;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.users.UserStatus;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.users.UserStatusName;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.LapanganRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.AlatOlahragaRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.RoleRepository;
+import io.mpruy.gor_gemilangcondet.backend_api.repository.UserStatusRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.annotation.Order;
@@ -39,13 +42,16 @@ import org.springframework.core.annotation.Order;
 public class DataSeeder implements ApplicationRunner {
 
     private final RoleRepository roleRepository;
+    private final UserStatusRepository userStatusRepository;
     private final LapanganRepository lapanganRepository;
     private final AlatOlahragaRepository alatOlahragaRepository;
     private final EntityManager entityManager;
 
     @Override
     public void run(ApplicationArguments args) {
+        seedUserStatuses();
         seedRoles();
+        seedCourts();
         seedLapangan(); // nantinya tergantung GOR
         seedAlatOlahraga(); // nantinya tergantung GOR, bisa jadi tidak ada alat olahraga yang disewakan
         resetAllLapanganToTersedia();
@@ -66,6 +72,44 @@ public class DataSeeder implements ApplicationRunner {
             if (roleRepository.findByRoleName(roleName).isEmpty()) {
                 roleRepository.save(Role.builder().roleName(roleName).build());
                 log.info("Seeded role: {}", roleName);
+            }
+        }
+    }
+
+    private void seedUserStatuses() {
+        for (UserStatusName statusName : UserStatusName.values()) {
+            if (userStatusRepository.findByName(statusName).isEmpty()) {
+                userStatusRepository.save(UserStatus.builder().name(statusName).build());
+                log.info("Seeded user status: {}", statusName);
+            }
+        }
+    }
+
+    /**
+     * Menyiapkan 6 lapangan (court) yang merepresentasikan lapangan badminton
+     * di GOR Gemilang Condet (id 1–6, nama "Court 1" s/d "Court 6").
+     *
+     * <p>
+     * Metode ini idempotent — jika data sudah ada, tidak akan membuat duplikasi.
+     *
+     * @see Court
+     * @see CourtRepository
+     */
+    private void seedCourts() {
+        for (int i = 1; i <= 6; i++) {
+            String name = "Court " + i;
+            if (lapanganRepository.findByName(name).isEmpty()) {
+                LocalDateTime now = LocalDateTime.now();
+                Lapangan court = Lapangan.builder()
+                        .name(name)
+                        .type(LapanganType.BADMINTON)
+                        .status(LapanganStatus.TERSEDIA)
+                        .tarifPerJam(50000)
+                        .createdAt(now)
+                        .updatedAt(now)
+                        .build();
+                lapanganRepository.save(court);
+                log.info("Seeded court: {} ({})", court.getName(), court.getType());
             }
         }
     }

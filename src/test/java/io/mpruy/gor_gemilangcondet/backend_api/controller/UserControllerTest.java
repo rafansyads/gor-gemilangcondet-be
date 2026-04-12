@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -120,5 +121,53 @@ class UserControllerTest {
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.user.username").value("updated"));
+    }
+
+    @Test
+    @DisplayName("GET /users/pending-admin-registrations → 200 OK")
+    void getPendingAdminRegistrations_Success() throws Exception {
+        UserDto pending = UserDto.builder()
+                .id(UUID.randomUUID())
+                .username("pending_admin")
+                .email("pending_admin@test.com")
+                .role(RoleName.ADMIN)
+                .status("PENDING")
+                .build();
+
+        when(userService.getPendingAdminRegistrations()).thenReturn(List.of(pending));
+
+        mockMvc.perform(get("/users/pending-admin-registrations"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].status").value("PENDING"));
+    }
+
+    @Test
+    @DisplayName("PATCH /users/pending-admin-registrations/{id}/approve → 200 OK")
+    void approvePendingAdminRegistration_Success() throws Exception {
+        UUID id = UUID.randomUUID();
+        UserDto approved = UserDto.builder()
+                .id(id)
+                .username("approved_admin")
+                .email("approved_admin@test.com")
+                .role(RoleName.ADMIN)
+                .status("AKTIF")
+                .build();
+
+        when(userService.approvePendingAdminRegistration(id)).thenReturn(approved);
+
+        mockMvc.perform(patch("/users/pending-admin-registrations/" + id + "/approve"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("AKTIF"));
+    }
+
+    @Test
+    @DisplayName("DELETE /users/pending-admin-registrations/{id}/reject → 200 OK")
+    void rejectPendingAdminRegistration_Success() throws Exception {
+        UUID id = UUID.randomUUID();
+        doNothing().when(userService).rejectPendingAdminRegistration(id);
+
+        mockMvc.perform(delete("/users/pending-admin-registrations/" + id + "/reject"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Registrasi admin/staff berhasil ditolak"));
     }
 }

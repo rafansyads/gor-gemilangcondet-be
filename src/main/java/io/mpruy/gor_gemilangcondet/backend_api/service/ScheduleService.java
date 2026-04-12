@@ -13,6 +13,8 @@ import io.mpruy.gor_gemilangcondet.backend_api.entity.Booking;
 import io.mpruy.gor_gemilangcondet.backend_api.enums.BookingStatus;
 import io.mpruy.gor_gemilangcondet.backend_api.event.BookingStatusChangedEvent;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.ExternalServiceException;
+import io.mpruy.gor_gemilangcondet.backend_api.exception.ResourceNotFoundException;
+import io.mpruy.gor_gemilangcondet.backend_api.exception.ConflictException;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.BookingRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.LapanganRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.security.JwtRoleExtractor;
@@ -258,7 +260,7 @@ public class ScheduleService {
      * Buat booking baru (digunakan oleh endpoint test simulasi).
      * Langsung berstatus CONFIRMED dan memicu broadcast WebSocket.
      *
-     * @throws IllegalArgumentException jika lapangan tidak ditemukan atau slot
+     * @throws ResourceNotFoundException jika lapangan tidak ditemukan atau slot
      *                                  sudah terisi
      */
     @Transactional
@@ -268,7 +270,7 @@ public class ScheduleService {
                 .toList();
 
         if (courtIndex < 1 || courtIndex > allCourts.size()) {
-            throw new IllegalArgumentException("Lapangan tidak ditemukan: index " + courtIndex);
+            throw new ResourceNotFoundException("Lapangan tidak ditemukan: index " + courtIndex);
         }
         Lapangan lapangan = allCourts.get(courtIndex - 1);
 
@@ -278,7 +280,7 @@ public class ScheduleService {
                 .anyMatch(b -> b.getLapangan().getId().equals(lapangan.getId()) && b.getStartTime().equals(time));
 
         if (alreadyBooked) {
-            throw new IllegalStateException("Slot sudah dipesan untuk lapangan " + lapangan.getName() + " jam " + time);
+            throw new ConflictException("Slot sudah dipesan untuk lapangan " + lapangan.getName() + " jam " + time);
         }
 
         Booking booking = Booking.builder()
@@ -301,7 +303,7 @@ public class ScheduleService {
     @Transactional
     public void cancelTestBooking(UUID bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new IllegalArgumentException("Booking tidak ditemukan: " + bookingId));
+                .orElseThrow(() -> new ResourceNotFoundException("Booking tidak ditemukan: " + bookingId));
         booking.setStatus(BookingStatus.CANCELLED);
         booking = bookingRepository.save(booking);
         notifySlotChanged(booking);

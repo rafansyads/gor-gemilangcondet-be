@@ -92,13 +92,24 @@ public class AuthController {
     // POST /auth/register-admin (privileged — STAF_LAPANGAN/STAF_TOKO/OWNER/ADMIN)
     // ──────────────────────────────────────────────────────────────────────────
 
+    /**
+     * Registers admin/staff account candidates.
+     * New users are saved with status PENDING and must be approved by ADMIN.
+     * 
+     * @param request wrapped {@link RegisterRequest}
+     * @return 201 Created with {@link RegisterResponse} if registration
+     *         is successful;
+     * @return 400 Bad Request if the request data is invalid or if the
+     *         registration fails due to business rules (e.g. username/email already
+     *         taken)
+     */
     @PostMapping("/register-admin")
     public ResponseEntity<BaseResponseDto<RegisterResponse>> registerAdmin(
             @Validated @RequestBody BaseRequestDto<RegisterRequest> request) {
         RegisterResponse registerResponse = authService.registerAdmin(request.getData());
         return ResponseUtil.success(
                 registerResponse,
-                "Akun admin/staff berhasil dibuat",
+                "Akun admin/staff berhasil diajukan dan menunggu persetujuan admin",
                 HttpStatus.CREATED)
                 .toBuilder().build();
     }

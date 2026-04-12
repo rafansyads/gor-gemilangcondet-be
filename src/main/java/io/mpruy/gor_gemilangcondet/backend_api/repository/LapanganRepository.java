@@ -1,17 +1,18 @@
 package io.mpruy.gor_gemilangcondet.backend_api.repository;
 
-import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.Lapangan;
-import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.LapanganType;
-import jakarta.persistence.LockModeType;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.Lapangan;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.LapanganType;
+import jakarta.persistence.LockModeType;
 
 @Repository
 public interface LapanganRepository extends JpaRepository<Lapangan, UUID> {
