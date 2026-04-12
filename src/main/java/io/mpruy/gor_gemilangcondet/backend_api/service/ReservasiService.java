@@ -459,6 +459,32 @@ public class ReservasiService {
                                         ") harus sama dengan jumlah jam pesanan awal (" + totalOldDuration + ")");
                 }
 
+                // 2b. Validate consecutive-group pattern is preserved
+                // Expand each reservation into individual hours (e.g. 13:00-15:00 → [13, 14])
+                List<Integer> oldHours = batchReservations.stream()
+                                .flatMapToInt(r -> {
+                                        int start = r.getReservationStart().getHour();
+                                        int duration = (int) ChronoUnit.HOURS.between(r.getReservationStart(), r.getReservationEnd());
+                                        return java.util.stream.IntStream.range(start, start + duration);
+                                })
+                                .boxed()
+                                .collect(Collectors.toList());
+                List<Integer> oldGroupSizes = computeConsecutiveGroupSizes(oldHours);
+                List<Integer> newGroupSizes = computeConsecutiveGroupSizes(
+                                request.getNewStarts().stream()
+                                                .map(LocalDateTime::getHour)
+                                                .collect(Collectors.toList()));
+
+                Collections.sort(oldGroupSizes);
+                Collections.sort(newGroupSizes);
+                if (!oldGroupSizes.equals(newGroupSizes)) {
+                        throw new BadRequestException(
+                                        "Pola slot harus sama dengan pesanan awal. "
+                                        + "Slot berurutan harus tetap berurutan. "
+                                        + "Contoh: jika awalnya 2 jam berurutan + 1 jam terpisah, "
+                                        + "maka jadwal baru juga harus 2 jam berurutan + 1 jam terpisah.");
+                }
+
                 // 3. Prepare common context from the primary (first) reservation
                 Reservasi primary = batchReservations.get(0);
                 UUID userId = primary.getUserId();
@@ -964,5 +990,26 @@ public class ReservasiService {
                         }
                 }
                 return responses;
+        }
+
+        /**
+         * Groups a list of hours into consecutive runs and returns the sizes.
+         * E.g. [9, 10, 13] → groups [9,10] and [13] → sizes [2, 1]
+         */
+        private List<Integer> computeConsecutiveGroupSizes(List<Integer> hours) {
+                if (hours.isEmpty()) return List.of();
+                List<Integer> sorted = hours.stream().sorted().collect(Collectors.toList());
+                List<Integer> groupSizes = new ArrayList<>();
+                int groupSize = 1;
+                for (int i = 1; i < sorted.size(); i++) {
+                        if (sorted.get(i) == sorted.get(i - 1) + 1) {
+                                groupSize++;
+                        } else {
+                                groupSizes.add(groupSize);
+                                groupSize = 1;
+                        }
+                }
+                groupSizes.add(groupSize);
+                return groupSizes;
         }
 }
