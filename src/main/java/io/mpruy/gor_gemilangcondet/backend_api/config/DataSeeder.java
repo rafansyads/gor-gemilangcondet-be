@@ -15,11 +15,13 @@ import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.LapanganSta
 import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.LapanganType;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.AlatOlahraga;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.AlatOlahragaStatus;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.Barang;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.BarangType;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.Role;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.RoleName;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.UserStatus;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.UserStatusName;
+import io.mpruy.gor_gemilangcondet.backend_api.repository.BarangRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.LapanganRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.AlatOlahragaRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.RoleRepository;
@@ -45,15 +47,16 @@ public class DataSeeder implements ApplicationRunner {
     private final UserStatusRepository userStatusRepository;
     private final LapanganRepository lapanganRepository;
     private final AlatOlahragaRepository alatOlahragaRepository;
+    private final BarangRepository barangRepository;
     private final EntityManager entityManager;
 
     @Override
     public void run(ApplicationArguments args) {
         seedUserStatuses();
         seedRoles();
-        seedCourts();
         seedLapangan(); // nantinya tergantung GOR
         seedAlatOlahraga(); // nantinya tergantung GOR, bisa jadi tidak ada alat olahraga yang disewakan
+        seedBarangJual(); // seed makanan & minuman untuk dijual di kasir
         resetAllLapanganToTersedia();
     }
 
@@ -81,35 +84,6 @@ public class DataSeeder implements ApplicationRunner {
             if (userStatusRepository.findByName(statusName).isEmpty()) {
                 userStatusRepository.save(UserStatus.builder().name(statusName).build());
                 log.info("Seeded user status: {}", statusName);
-            }
-        }
-    }
-
-    /**
-     * Menyiapkan 6 lapangan (court) yang merepresentasikan lapangan badminton
-     * di GOR Gemilang Condet (id 1–6, nama "Court 1" s/d "Court 6").
-     *
-     * <p>
-     * Metode ini idempotent — jika data sudah ada, tidak akan membuat duplikasi.
-     *
-     * @see Court
-     * @see CourtRepository
-     */
-    private void seedCourts() {
-        for (int i = 1; i <= 6; i++) {
-            String name = "Court " + i;
-            if (lapanganRepository.findByName(name).isEmpty()) {
-                LocalDateTime now = LocalDateTime.now();
-                Lapangan court = Lapangan.builder()
-                        .name(name)
-                        .type(LapanganType.BADMINTON)
-                        .status(LapanganStatus.TERSEDIA)
-                        .tarifPerJam(50000)
-                        .createdAt(now)
-                        .updatedAt(now)
-                        .build();
-                lapanganRepository.save(court);
-                log.info("Seeded court: {} ({})", court.getName(), court.getType());
             }
         }
     }
@@ -229,11 +203,14 @@ public class DataSeeder implements ApplicationRunner {
      */
     @Transactional
     public void seedAlatOlahraga() {
-        // Delete orphaned barang rows (no matching alat_olahraga child) first
+        // Clean up orphaned barang rows that were meant to be alat_olahraga
+        // but lost their child row due to schema changes. Only deletes barang
+        // that have a matching name in the seed list but no alat_olahraga child.
         try {
             int deleted = entityManager
                     .createNativeQuery(
-                            "DELETE FROM barang WHERE id NOT IN (SELECT id FROM alat_olahraga)")
+                            "DELETE FROM barang b WHERE b.id NOT IN (SELECT ao.id FROM alat_olahraga ao) "
+                                    + "AND b.name = 'Raket Badminton Premium'")
                     .executeUpdate();
             if (deleted > 0) {
                 log.info("Cleaned up {} orphaned barang row(s)", deleted);
@@ -244,7 +221,8 @@ public class DataSeeder implements ApplicationRunner {
         }
 
         // If alat_olahraga already has rows, stop
-        if (alatOlahragaRepository.count() > 0) return;
+        if (alatOlahragaRepository.count() > 0)
+            return;
 
         LocalDateTime now = LocalDateTime.now();
         List<AlatOlahraga> equipment = List.of(
@@ -255,5 +233,51 @@ public class DataSeeder implements ApplicationRunner {
         alatOlahragaRepository.saveAll(equipment);
         equipment.forEach(e -> log.info("Seeded alat olahraga: {} ({}) - stok: {}",
                 e.getName(), e.getType(), e.getStock()));
+    }
+
+    /**
+     * Development-seeding.
+     * Seeds sellable items (makanan & minuman) into the barang table.
+     * These are NOT AlatOlahraga — they are plain Barang sold at the POS.
+     * Idempotent: skips if any MAKANAN or MINUMAN barang already exists.
+     */
+    @Transactional
+    public void seedBarangJual() {
+        boolean hasMakanan = barangRepository.findAll().stream()
+                .anyMatch(b -> b.getType() == BarangType.MAKANAN || b.getType() == BarangType.MINUMAN);
+        if (hasMakanan)
+            return;
+
+        LocalDateTime now = LocalDateTime.now();
+        List<Barang> items = List.of(
+                // Makanan
+                Barang.builder().name("Nasi Goreng").type(BarangType.MAKANAN)
+                        .stock(50).price(15000).createdAt(now).updatedAt(now).build(),
+                Barang.builder().name("Mie Goreng").type(BarangType.MAKANAN)
+                        .stock(50).price(12000).createdAt(now).updatedAt(now).build(),
+                Barang.builder().name("Roti Bakar").type(BarangType.MAKANAN)
+                        .stock(30).price(10000).createdAt(now).updatedAt(now).build(),
+                Barang.builder().name("Kentang Goreng").type(BarangType.MAKANAN)
+                        .stock(40).price(12000).createdAt(now).updatedAt(now).build(),
+                // Raket (dijual, bukan disewa)
+                Barang.builder().name("Raket Yonex").type(BarangType.RAKET)
+                        .stock(10).price(450000).createdAt(now).updatedAt(now).build(),
+                Barang.builder().name("Raket Li-Ning").type(BarangType.RAKET)
+                        .stock(8).price(350000).createdAt(now).updatedAt(now).build(),
+                // Minuman
+                Barang.builder().name("Teh Botol").type(BarangType.MINUMAN)
+                        .stock(100).price(7000).createdAt(now).updatedAt(now).build(),
+                Barang.builder().name("Air Mineral").type(BarangType.MINUMAN)
+                        .stock(100).price(5000).createdAt(now).updatedAt(now).build(),
+                Barang.builder().name("Kopi Hitam").type(BarangType.MINUMAN)
+                        .stock(60).price(10000).createdAt(now).updatedAt(now).build(),
+                Barang.builder().name("Es Jeruk").type(BarangType.MINUMAN)
+                        .stock(60).price(8000).createdAt(now).updatedAt(now).build(),
+                Barang.builder().name("Pocari Sweat").type(BarangType.MINUMAN)
+                        .stock(80).price(10000).createdAt(now).updatedAt(now).build());
+
+        barangRepository.saveAll(items);
+        items.forEach(b -> log.info("Seeded barang jual: {} ({}) - stok: {} - harga: {}",
+                b.getName(), b.getType(), b.getStock(), b.getPrice()));
     }
 }

@@ -67,11 +67,15 @@ class UserServiceTest {
     private Role guestRole;
     private UserStatus activeStatus;
     private UserStatus pendingStatus;
+    private UserStatus activeStatus;
+    private UserStatus pendingStatus;
 
     @BeforeEach
     void setUp() {
         userId = UUID.randomUUID();
         guestRole = Role.builder().id(1).roleName(RoleName.GUEST).build();
+        activeStatus = UserStatus.builder().id(1).name(UserStatusName.AKTIF).build();
+        pendingStatus = UserStatus.builder().id(2).name(UserStatusName.PENDING).build();
         activeStatus = UserStatus.builder().id(1).name(UserStatusName.AKTIF).build();
         pendingStatus = UserStatus.builder().id(2).name(UserStatusName.PENDING).build();
         testUser = User.builder()

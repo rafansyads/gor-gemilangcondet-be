@@ -152,7 +152,19 @@ public class UserService {
             throw new BadRequestException("Tidak ada pengguna yang terautentikasi");
         }
 
+        if (request.getUsername() == null || request.getEmail() == null) {
+            throw new BadRequestException("Username dan email tidak boleh kosong");
+        }
+
+        if (authentication == null || !(authentication.getPrincipal() instanceof UserDetailsImpl)) {
+            throw new BadRequestException("Tidak ada pengguna yang terautentikasi");
+        }
+
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+
+        if (userDetails == null) {
+            throw new BadRequestException("Tidak ada pengguna yang terautentikasi");
+        }
 
         if (userDetails == null) {
             throw new BadRequestException("Tidak ada pengguna yang terautentikasi");
@@ -186,6 +198,8 @@ public class UserService {
 
         // Rotate refresh token: revoke old username's token, create one for new
         // username
+        // Rotate refresh token: revoke old username's token, create one for new
+        // username
         refreshTokenService.deleteRefreshTokenByUsername(oldUsername);
         String newRefreshToken = refreshTokenService.createRefreshToken(updated.getUsername());
 
@@ -193,7 +207,6 @@ public class UserService {
         // principal
         UsernamePasswordAuthenticationToken newAuth = new UsernamePasswordAuthenticationToken(newUserDetails, null,
                 newUserDetails.getAuthorities());
-        SecurityContextHolder.getContext().setAuthentication(newAuth);
 
         return UpdateProfileResponse.builder()
                 .user(toDto(updated))
@@ -212,6 +225,7 @@ public class UserService {
                 .username(user.getUsername())
                 .email(user.getEmail())
                 .role(user.getRole().getRoleName())
+                .status(user.getStatus() != null ? user.getStatus().getName().name() : null)
                 .status(user.getStatus() != null ? user.getStatus().getName().name() : null)
                 .membershipStart(user.getMembershipStart())
                 .membershipEnd(user.getMembershipEnd())
