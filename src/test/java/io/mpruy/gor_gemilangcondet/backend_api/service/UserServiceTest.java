@@ -1,5 +1,33 @@
 package io.mpruy.gor_gemilangcondet.backend_api.service;
 
+import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+
 import io.mpruy.gor_gemilangcondet.backend_api.dto.users.UserDto;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.users.requests.UpdateProfileRequest;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.users.responses.UpdateProfileResponse;
@@ -15,27 +43,6 @@ import io.mpruy.gor_gemilangcondet.backend_api.repository.UserStatusRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.security.UserDetailsImpl;
 import io.mpruy.gor_gemilangcondet.backend_api.security.jwt.JwtUtils;
 import io.mpruy.gor_gemilangcondet.backend_api.security.service.RefreshTokenService;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
-
-import java.time.LocalDateTime;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyCollection;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -140,8 +147,8 @@ class UserServiceTest {
     class PendingAdminRegistrationTests {
 
         @Test
-        @DisplayName("Should return pending admin/staff registrations")
-        void getPendingAdminRegistrations_Success() {
+        @DisplayName("Should return admin-assignable users by allowed statuses")
+        void getAllAdminByAdminAssignableStatus_Success() {
             User pendingStaff = User.builder()
                     .id(UUID.randomUUID())
                     .username("staf_pending")
@@ -151,14 +158,18 @@ class UserServiceTest {
                     .status(pendingStatus)
                     .build();
 
-            when(userRepository.findByStatus_NameAndRole_RoleNameIn(eq(UserStatusName.PENDING), anyCollection()))
+            when(userRepository.findByStatus_NameInAndRole_RoleNameIn(anyCollection(), anyCollection()))
                     .thenReturn(List.of(pendingStaff));
 
-            List<UserDto> result = userService.getPendingAdminRegistrations();
+            List<UserDto> result = userService.getAllAdminByAdminAssignableStatus();
 
             assertEquals(1, result.size());
             assertEquals("staf_pending", result.get(0).getUsername());
             assertEquals(UserStatusName.PENDING.name(), result.get(0).getStatus());
+            verify(userRepository).findByStatus_NameInAndRole_RoleNameIn(
+                    eq(Set.of(UserStatusName.PENDING, UserStatusName.SUSPENDED, UserStatusName.BANNED,
+                            UserStatusName.AKTIF)),
+                    anyCollection());
         }
 
         @Test
@@ -174,8 +185,8 @@ class UserServiceTest {
                     .status(pendingStatus)
                     .build();
 
-            when(userRepository.findByIdAndStatus_NameAndRole_RoleNameIn(
-                    eq(pendingId), eq(UserStatusName.PENDING), anyCollection()))
+            when(userRepository.findByIdAndStatus_NameInAndRole_RoleNameIn(
+                    eq(pendingId), anyCollection(), anyCollection()))
                     .thenReturn(Optional.of(pendingStaff));
             when(userStatusRepository.findByName(UserStatusName.AKTIF)).thenReturn(Optional.of(activeStatus));
             when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
@@ -200,8 +211,8 @@ class UserServiceTest {
                     .status(pendingStatus)
                     .build();
 
-            when(userRepository.findByIdAndStatus_NameAndRole_RoleNameIn(
-                    eq(pendingId), eq(UserStatusName.PENDING), anyCollection()))
+            when(userRepository.findByIdAndStatus_NameInAndRole_RoleNameIn(
+                    eq(pendingId), anyCollection(), anyCollection()))
                     .thenReturn(Optional.of(pendingStaff));
             when(userStatusRepository.findByName(UserStatusName.BANNED)).thenReturn(Optional.of(bannedStatus));
             when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
@@ -218,8 +229,8 @@ class UserServiceTest {
         void approvePendingAdminRegistration_NotFound() {
             UUID pendingId = UUID.randomUUID();
 
-            when(userRepository.findByIdAndStatus_NameAndRole_RoleNameIn(
-                    eq(pendingId), eq(UserStatusName.PENDING), anyCollection()))
+            when(userRepository.findByIdAndStatus_NameInAndRole_RoleNameIn(
+                    eq(pendingId), anyCollection(), anyCollection()))
                     .thenReturn(Optional.empty());
 
             assertThrows(ResourceNotFoundException.class,
@@ -239,7 +250,8 @@ class UserServiceTest {
                     .bannedAt(LocalDateTime.now().minusDays(4))
                     .build();
 
-            when(userRepository.findByStatus_NameAndBannedAtLessThanEqual(eq(UserStatusName.BANNED), any(LocalDateTime.class)))
+            when(userRepository.findByStatus_NameAndBannedAtLessThanEqual(eq(UserStatusName.BANNED),
+                    any(LocalDateTime.class)))
                     .thenReturn(List.of(oldBanned));
 
             int deleted = userService.deleteExpiredBannedUsers();

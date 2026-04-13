@@ -74,11 +74,8 @@ public class UserService {
     // ──────────────────────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
-    public List<UserDto> getPendingAdminRegistrations() {
-        return userRepository.findByStatus_NameAndRole_RoleNameIn(
-                UserStatusName.PENDING,
-                ADMIN_ASSIGNABLE_ROLES)
-                .stream()
+    public List<UserDto> getAllAdminUsers() {
+        return userRepository.findByRole_RoleNameIn(ADMIN_ASSIGNABLE_ROLES).stream()
                 .map(this::toDto)
                 .toList();
     }

@@ -134,7 +134,7 @@ class UserControllerTest {
                 .status("PENDING")
                 .build();
 
-        when(userService.getPendingAdminRegistrations()).thenReturn(List.of(pending));
+        when(userService.getAllAdminByAdminAssignableStatus()).thenReturn(List.of(pending));
 
         mockMvc.perform(get("/users/pending-admin-registrations"))
                 .andExpect(status().isOk())

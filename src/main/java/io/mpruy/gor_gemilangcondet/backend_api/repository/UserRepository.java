@@ -28,7 +28,12 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     boolean existsByEmailAndIdNot(String email, UUID id);
 
+    List<User> findByRole_RoleNameIn(Collection<RoleName> roleNames);
+
     List<User> findByStatus_NameAndRole_RoleNameIn(UserStatusName statusName, Collection<RoleName> roleNames);
+
+    List<User> findByStatus_NameInAndRole_RoleNameIn(Collection<UserStatusName> statusNames,
+            Collection<RoleName> roleNames);
 
     List<User> findByStatus_NameAndBannedAtLessThanEqual(UserStatusName statusName, LocalDateTime threshold);
 
