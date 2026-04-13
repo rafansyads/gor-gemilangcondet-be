@@ -71,7 +71,7 @@ public class LoginAttemptService {
     /**
      * Removes all entries whose lockout period has expired.
      * Called periodically by
-     * {@link io.mpruy.gor_gemilangcondet.backend_api.config.AuthScheduler}.
+     * {@link io.mpruy.gor_gemilangcondet.backend_api.config.scheduler.AuthScheduler}.
      */
     public void cleanupExpiredLockouts() {
         LocalDateTime now = LocalDateTime.now();

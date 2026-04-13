@@ -1,4 +1,4 @@
-package io.mpruy.gor_gemilangcondet.backend_api.config;
+package io.mpruy.gor_gemilangcondet.backend_api.config.scheduler;
 
 import io.mpruy.gor_gemilangcondet.backend_api.service.LoginAttemptService;
 import lombok.RequiredArgsConstructor;

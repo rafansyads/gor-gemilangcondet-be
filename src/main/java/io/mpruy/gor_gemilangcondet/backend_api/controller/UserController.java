@@ -79,7 +79,7 @@ public class UserController {
     // ──────────────────────────────────────────────────────────────────────────
 
     /**
-     * Approves a pending admin/staff registration (PENDING -> AKTIF).
+     * Approves a pending/suspended admin/staff registration (PENDING/SUSPENDED -> AKTIF).
      * Only ADMIN can perform this action.
      */
     @PatchMapping("/pending-admin-registrations/{id}/approve")
@@ -95,17 +95,34 @@ public class UserController {
     // ──────────────────────────────────────────────────────────────────────────
 
     /**
-     * Rejects a pending admin/staff registration by deleting the pending user.
+     * Rejects a pending/suspended admin/staff registration (PENDING/SUSPENDED -> BANNED). The banned user will be deleted from the database 3 days after the rejection.
      * Only ADMIN can perform this action.
      */
     @DeleteMapping("/pending-admin-registrations/{id}/reject")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ResponseEntity<BaseResponseDto<String>> rejectPendingAdminRegistration(@PathVariable UUID id) {
-        userService.rejectPendingAdminRegistration(id);
+    public ResponseEntity<BaseResponseDto<UserDto>> rejectPendingAdminRegistration(@PathVariable UUID id) {
+        UserDto rejected = userService.rejectPendingAdminRegistration(id);
         return ResponseUtil
-                .success("Registrasi pending ditolak", "Registrasi admin/staff berhasil ditolak", HttpStatus.OK)
+                .success(rejected, "Registrasi admin/staff berhasil ditolak", HttpStatus.OK)
                 .toBuilder().build();
     }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // PATCH /users/{id}/suspend
+    // ──────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Suspend a user account (AKTIF -> SUSPENDED). Suspended users cannot log in until their account is reactivated by an admin.
+     * Only ADMIN can perform this action.
+     */
+    @PatchMapping("/{id}/suspend")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ResponseEntity<BaseResponseDto<UserDto>> suspendUser(@PathVariable UUID id) {
+        UserDto suspended = userService.suspendUser(id);
+        return ResponseUtil.success(suspended, "Pengguna berhasil disuspend", HttpStatus.OK)
+                .toBuilder().build();
+    }
+
 
     // ──────────────────────────────────────────────────────────────────────────
     // PUT /users/profile

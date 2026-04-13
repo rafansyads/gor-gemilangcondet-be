@@ -164,7 +164,14 @@ class UserControllerTest {
     @DisplayName("DELETE /users/pending-admin-registrations/{id}/reject → 200 OK")
     void rejectPendingAdminRegistration_Success() throws Exception {
         UUID id = UUID.randomUUID();
-        doNothing().when(userService).rejectPendingAdminRegistration(id);
+        UserDto rejected = UserDto.builder()
+                .id(id)
+                .username("rejected_admin")
+                .email("rejected_admin@test.com")
+                .role(RoleName.ADMIN)
+                .status("BANNED")
+                .build();
+        when(userService.rejectPendingAdminRegistration(id)).thenReturn(rejected);
 
         mockMvc.perform(delete("/users/pending-admin-registrations/" + id + "/reject"))
                 .andExpect(status().isOk())
