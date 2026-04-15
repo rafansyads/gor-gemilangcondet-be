@@ -2,7 +2,6 @@ package io.mpruy.gor_gemilangcondet.backend_api.security;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -96,7 +95,7 @@ class UserPendingRegistrationSecurityIntegrationTest {
                 .status("PENDING")
                 .build();
 
-        when(userService.getPendingAdminRegistrations()).thenReturn(List.of(pending));
+        when(userService.getAllAdminByAdminAssignableStatus()).thenReturn(List.of(pending));
 
         mockMvc.perform(get("/users/pending-admin-registrations"))
                 .andExpect(status().isOk());
@@ -142,7 +141,14 @@ class UserPendingRegistrationSecurityIntegrationTest {
     @DisplayName("Reject pending should return 200 for admin users")
     void rejectPending_Admin_Returns200() throws Exception {
         UUID id = UUID.randomUUID();
-        doNothing().when(userService).rejectPendingAdminRegistration(any(UUID.class));
+        UserDto rejected = UserDto.builder()
+                .id(id)
+                .username("rejected_admin")
+                .email("rejected_admin@test.com")
+                .role(RoleName.ADMIN)
+                .status("BANNED")
+                .build();
+        when(userService.rejectPendingAdminRegistration(any(UUID.class))).thenReturn(rejected);
 
         mockMvc.perform(delete("/users/pending-admin-registrations/{id}/reject", id))
                 .andExpect(status().isOk());

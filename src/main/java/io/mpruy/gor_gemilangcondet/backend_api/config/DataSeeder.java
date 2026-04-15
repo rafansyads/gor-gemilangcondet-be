@@ -88,7 +88,6 @@ public class DataSeeder implements ApplicationRunner {
         }
     }
 
-
     /**
      * Development-seeding.
      * Checks each Lapangan Type against the database and inserts any missing
@@ -211,7 +210,7 @@ public class DataSeeder implements ApplicationRunner {
             int deleted = entityManager
                     .createNativeQuery(
                             "DELETE FROM barang b WHERE b.id NOT IN (SELECT ao.id FROM alat_olahraga ao) "
-                            + "AND b.name = 'Raket Badminton Premium'")
+                                    + "AND b.name = 'Raket Badminton Premium'")
                     .executeUpdate();
             if (deleted > 0) {
                 log.info("Cleaned up {} orphaned barang row(s)", deleted);
@@ -222,7 +221,8 @@ public class DataSeeder implements ApplicationRunner {
         }
 
         // If alat_olahraga already has rows, stop
-        if (alatOlahragaRepository.count() > 0) return;
+        if (alatOlahragaRepository.count() > 0)
+            return;
 
         LocalDateTime now = LocalDateTime.now();
         List<AlatOlahraga> equipment = List.of(
@@ -245,7 +245,8 @@ public class DataSeeder implements ApplicationRunner {
     public void seedBarangJual() {
         boolean hasMakanan = barangRepository.findAll().stream()
                 .anyMatch(b -> b.getType() == BarangType.MAKANAN || b.getType() == BarangType.MINUMAN);
-        if (hasMakanan) return;
+        if (hasMakanan)
+            return;
 
         LocalDateTime now = LocalDateTime.now();
         List<Barang> items = List.of(
@@ -273,8 +274,7 @@ public class DataSeeder implements ApplicationRunner {
                 Barang.builder().name("Es Jeruk").type(BarangType.MINUMAN)
                         .stock(60).price(8000).createdAt(now).updatedAt(now).build(),
                 Barang.builder().name("Pocari Sweat").type(BarangType.MINUMAN)
-                        .stock(80).price(10000).createdAt(now).updatedAt(now).build()
-        );
+                        .stock(80).price(10000).createdAt(now).updatedAt(now).build());
 
         barangRepository.saveAll(items);
         items.forEach(b -> log.info("Seeded barang jual: {} ({}) - stok: {} - harga: {}",
