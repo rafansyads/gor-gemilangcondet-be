@@ -1,7 +1,10 @@
 package io.mpruy.gor_gemilangcondet.backend_api.config;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import jakarta.persistence.EntityManager;
 import org.springframework.boot.ApplicationArguments;
@@ -16,11 +19,19 @@ import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.Barang;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.alat_olahraga.AlatOlahraga;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.alat_olahraga.AlatOlahragaStatus;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.alat_olahraga.AlatOlahragaType;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.kantin.BarangKantin;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.kantin.BarangKantinStatus;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.kantin.BarangKantinType;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.toko.BarangToko;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.toko.BarangTokoStatus;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.toko.BarangTokoType;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.Role;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.RoleName;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.UserStatus;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.UserStatusName;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.BarangRepository;
+import io.mpruy.gor_gemilangcondet.backend_api.repository.BarangKantinRepository;
+import io.mpruy.gor_gemilangcondet.backend_api.repository.BarangTokoRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.LapanganRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.AlatOlahragaRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.RoleRepository;
@@ -47,6 +58,8 @@ public class DataSeeder implements ApplicationRunner {
     private final LapanganRepository lapanganRepository;
     private final AlatOlahragaRepository alatOlahragaRepository;
     private final BarangRepository barangRepository;
+    private final BarangKantinRepository barangKantinRepository;
+    private final BarangTokoRepository barangTokoRepository;
     private final EntityManager entityManager;
 
     @Override
@@ -55,8 +68,58 @@ public class DataSeeder implements ApplicationRunner {
         seedRoles();
         seedLapangan(); // nantinya tergantung GOR
         seedAlatOlahraga(); // nantinya tergantung GOR, bisa jadi tidak ada alat olahraga yang disewakan
+        migrateLegacySellableRowsToConcreteSubclasses();
         seedBarangJual(); // seed makanan & minuman untuk dijual di kasir
         resetAllLapanganToTersedia();
+    }
+
+    @Transactional
+    private void migrateLegacySellableRowsToConcreteSubclasses() {
+        // Convert legacy plain barang rows (pre-abstract migration) into concrete
+        // child rows while preserving existing IDs and FK references.
+        migrateLegacyKantin("Nasi Goreng", "MAKANAN_BERAT", 10);
+        migrateLegacyKantin("Mie Goreng", "MAKANAN_BERAT", 10);
+        migrateLegacyKantin("Roti Bakar", "MAKANAN_RINGAN", 8);
+        migrateLegacyKantin("Kentang Goreng", "MAKANAN_RINGAN", 8);
+        migrateLegacyKantin("Teh Botol", "MINUMAN", 20);
+        migrateLegacyKantin("Air Mineral", "MINUMAN", 20);
+        migrateLegacyKantin("Kopi Hitam", "MINUMAN", 15);
+        migrateLegacyKantin("Es Jeruk", "MINUMAN", 15);
+        migrateLegacyKantin("Pocari Sweat", "MINUMAN", 20);
+
+        migrateLegacyToko("Raket Yonex", "ALAT_OLAHRAGA");
+        migrateLegacyToko("Raket Li-Ning", "ALAT_OLAHRAGA");
+
+        entityManager.flush();
+    }
+
+    private void migrateLegacyKantin(String name, String type, long threshold) {
+        entityManager.createNativeQuery(
+                "INSERT INTO barang_kantin (id, type, status, reorder_threshold) "
+                        + "SELECT b.id, :type, CASE WHEN b.stock > 0 THEN 'TERSEDIA' ELSE 'TERJUAL' END, :threshold "
+                        + "FROM barang b "
+                        + "LEFT JOIN barang_kantin bk ON bk.id = b.id "
+                        + "LEFT JOIN barang_toko bt ON bt.id = b.id "
+                        + "LEFT JOIN alat_olahraga ao ON ao.id = b.id "
+                        + "WHERE b.name = :name AND bk.id IS NULL AND bt.id IS NULL AND ao.id IS NULL")
+                .setParameter("name", name)
+                .setParameter("type", type)
+                .setParameter("threshold", threshold)
+                .executeUpdate();
+    }
+
+    private void migrateLegacyToko(String name, String type) {
+        entityManager.createNativeQuery(
+                "INSERT INTO barang_toko (id, type, status) "
+                        + "SELECT b.id, :type, CASE WHEN b.stock > 0 THEN 'TERSEDIA' ELSE 'TERJUAL' END "
+                        + "FROM barang b "
+                        + "LEFT JOIN barang_kantin bk ON bk.id = b.id "
+                        + "LEFT JOIN barang_toko bt ON bt.id = b.id "
+                        + "LEFT JOIN alat_olahraga ao ON ao.id = b.id "
+                        + "WHERE b.name = :name AND bk.id IS NULL AND bt.id IS NULL AND ao.id IS NULL")
+                .setParameter("name", name)
+                .setParameter("type", type)
+                .executeUpdate();
     }
 
     /**
@@ -224,63 +287,119 @@ public class DataSeeder implements ApplicationRunner {
             return;
 
         LocalDateTime now = LocalDateTime.now();
-        List<AlatOlahraga> equipment = List.of(
-                AlatOlahraga.builder().name("Raket Badminton Premium").type(AlatOlahragaType.RAKET)
-                        .stock(20).price(25000).status(AlatOlahragaStatus.TERSEDIA)
-                        .createdAt(now).updatedAt(now).build());
+        List<AlatOlahraga> equipment = new ArrayList<>();
+        for (int i = 1; i <= 20; i++) {
+            equipment.add(
+                    AlatOlahraga.builder()
+                            .name(String.format("Raket Badminton Premium #%02d", i))
+                            .type(AlatOlahragaType.RAKET)
+                            .stock(1)
+                            .price(25000)
+                            .status(AlatOlahragaStatus.TERSEDIA)
+                            .createdAt(now)
+                            .updatedAt(now)
+                            .build());
+        }
 
         alatOlahragaRepository.saveAll(equipment);
-        equipment.forEach(e -> log.info("Seeded alat olahraga: {} ({}) - stok: {}",
-                e.getName(), e.getType(), e.getStock()));
+        log.info("Seeded {} unit alat olahraga tipe RAKET", equipment.size());
     }
 
     /**
      * Development-seeding.
-     * Seeds sellable items (makanan & minuman) into the barang table.
-     * These are NOT AlatOlahraga — they are plain Barang sold at the POS.
-     * Idempotent: skips if any MAKANAN or MINUMAN barang already exists.
+     * Seeds sellable items into concrete subclasses (kantin & toko).
+     * Idempotent by name to avoid duplicate seeds on repeated startup.
      */
     @Transactional
     public void seedBarangJual() {
-        List<String> sellableNames = List.of(
+        Set<String> existingNames = new HashSet<>(
+                barangRepository.findAll().stream()
+                        .map(Barang::getName)
+                        .toList());
+
+        List<String> targetNames = List.of(
                 "Nasi Goreng", "Mie Goreng", "Roti Bakar", "Kentang Goreng",
                 "Raket Yonex", "Raket Li-Ning",
                 "Teh Botol", "Air Mineral", "Kopi Hitam", "Es Jeruk", "Pocari Sweat");
-        boolean hasSellableItems = barangRepository.findAll().stream()
-                .anyMatch(b -> sellableNames.contains(b.getName()));
-        if (hasSellableItems)
+
+        boolean allSeeded = targetNames.stream().allMatch(existingNames::contains);
+        if (allSeeded) {
             return;
+        }
 
         LocalDateTime now = LocalDateTime.now();
-        List<Barang> items = List.of(
-                // Makanan
-                Barang.builder().name("Nasi Goreng")
-                        .stock(50).price(15000).createdAt(now).updatedAt(now).build(),
-                Barang.builder().name("Mie Goreng")
-                        .stock(50).price(12000).createdAt(now).updatedAt(now).build(),
-                Barang.builder().name("Roti Bakar")
-                        .stock(30).price(10000).createdAt(now).updatedAt(now).build(),
-                Barang.builder().name("Kentang Goreng")
-                        .stock(40).price(12000).createdAt(now).updatedAt(now).build(),
-                // Raket (dijual, bukan disewa)
-                Barang.builder().name("Raket Yonex")
-                        .stock(10).price(450000).createdAt(now).updatedAt(now).build(),
-                Barang.builder().name("Raket Li-Ning")
-                        .stock(8).price(350000).createdAt(now).updatedAt(now).build(),
-                // Minuman
-                Barang.builder().name("Teh Botol")
-                        .stock(100).price(7000).createdAt(now).updatedAt(now).build(),
-                Barang.builder().name("Air Mineral")
-                        .stock(100).price(5000).createdAt(now).updatedAt(now).build(),
-                Barang.builder().name("Kopi Hitam")
-                        .stock(60).price(10000).createdAt(now).updatedAt(now).build(),
-                Barang.builder().name("Es Jeruk")
-                        .stock(60).price(8000).createdAt(now).updatedAt(now).build(),
-                Barang.builder().name("Pocari Sweat")
-                        .stock(80).price(10000).createdAt(now).updatedAt(now).build());
 
-        barangRepository.saveAll(items);
-        items.forEach(b -> log.info("Seeded barang jual: {} - stok: {} - harga: {}",
-                b.getName(), b.getStock(), b.getPrice()));
+        List<BarangKantin> kantinItems = new ArrayList<>();
+        List<BarangToko> tokoItems = new ArrayList<>();
+
+        if (!existingNames.contains("Nasi Goreng")) {
+            kantinItems.add(BarangKantin.builder().name("Nasi Goreng")
+                    .type(BarangKantinType.MAKANAN_BERAT).status(BarangKantinStatus.TERSEDIA)
+                    .reorderThreshold(10).stock(50).price(15000).createdAt(now).updatedAt(now).build());
+        }
+        if (!existingNames.contains("Mie Goreng")) {
+            kantinItems.add(BarangKantin.builder().name("Mie Goreng")
+                    .type(BarangKantinType.MAKANAN_BERAT).status(BarangKantinStatus.TERSEDIA)
+                    .reorderThreshold(10).stock(50).price(12000).createdAt(now).updatedAt(now).build());
+        }
+        if (!existingNames.contains("Roti Bakar")) {
+            kantinItems.add(BarangKantin.builder().name("Roti Bakar")
+                    .type(BarangKantinType.MAKANAN_RINGAN).status(BarangKantinStatus.TERSEDIA)
+                    .reorderThreshold(8).stock(30).price(10000).createdAt(now).updatedAt(now).build());
+        }
+        if (!existingNames.contains("Kentang Goreng")) {
+            kantinItems.add(BarangKantin.builder().name("Kentang Goreng")
+                    .type(BarangKantinType.MAKANAN_RINGAN).status(BarangKantinStatus.TERSEDIA)
+                    .reorderThreshold(8).stock(40).price(12000).createdAt(now).updatedAt(now).build());
+        }
+
+        if (!existingNames.contains("Teh Botol")) {
+            kantinItems.add(BarangKantin.builder().name("Teh Botol")
+                    .type(BarangKantinType.MINUMAN).status(BarangKantinStatus.TERSEDIA)
+                    .reorderThreshold(20).stock(100).price(7000).createdAt(now).updatedAt(now).build());
+        }
+        if (!existingNames.contains("Air Mineral")) {
+            kantinItems.add(BarangKantin.builder().name("Air Mineral")
+                    .type(BarangKantinType.MINUMAN).status(BarangKantinStatus.TERSEDIA)
+                    .reorderThreshold(20).stock(100).price(5000).createdAt(now).updatedAt(now).build());
+        }
+        if (!existingNames.contains("Kopi Hitam")) {
+            kantinItems.add(BarangKantin.builder().name("Kopi Hitam")
+                    .type(BarangKantinType.MINUMAN).status(BarangKantinStatus.TERSEDIA)
+                    .reorderThreshold(15).stock(60).price(10000).createdAt(now).updatedAt(now).build());
+        }
+        if (!existingNames.contains("Es Jeruk")) {
+            kantinItems.add(BarangKantin.builder().name("Es Jeruk")
+                    .type(BarangKantinType.MINUMAN).status(BarangKantinStatus.TERSEDIA)
+                    .reorderThreshold(15).stock(60).price(8000).createdAt(now).updatedAt(now).build());
+        }
+        if (!existingNames.contains("Pocari Sweat")) {
+            kantinItems.add(BarangKantin.builder().name("Pocari Sweat")
+                    .type(BarangKantinType.MINUMAN).status(BarangKantinStatus.TERSEDIA)
+                    .reorderThreshold(20).stock(80).price(10000).createdAt(now).updatedAt(now).build());
+        }
+
+        if (!existingNames.contains("Raket Yonex")) {
+            tokoItems.add(BarangToko.builder().name("Raket Yonex")
+                    .type(BarangTokoType.ALAT_OLAHRAGA).status(BarangTokoStatus.TERSEDIA)
+                    .stock(10).price(450000).createdAt(now).updatedAt(now).build());
+        }
+        if (!existingNames.contains("Raket Li-Ning")) {
+            tokoItems.add(BarangToko.builder().name("Raket Li-Ning")
+                    .type(BarangTokoType.ALAT_OLAHRAGA).status(BarangTokoStatus.TERSEDIA)
+                    .stock(8).price(350000).createdAt(now).updatedAt(now).build());
+        }
+
+        if (!kantinItems.isEmpty()) {
+            barangKantinRepository.saveAll(kantinItems);
+            kantinItems.forEach(b -> log.info("Seeded barang kantin: {} - stok: {} - harga: {}",
+                    b.getName(), b.getStock(), b.getPrice()));
+        }
+
+        if (!tokoItems.isEmpty()) {
+            barangTokoRepository.saveAll(tokoItems);
+            tokoItems.forEach(b -> log.info("Seeded barang toko: {} - stok: {} - harga: {}",
+                    b.getName(), b.getStock(), b.getPrice()));
+        }
     }
 }

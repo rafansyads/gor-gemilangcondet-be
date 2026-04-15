@@ -15,7 +15,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @SuperBuilder
-public class Barang {
+public abstract class Barang {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

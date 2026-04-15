@@ -152,8 +152,6 @@ class ReservasiServiceTest {
             assertEquals(LapanganType.BADMINTON, result.getType());
         }
 
-        @Test
-        @DisplayName("Should delete court with no active reservations")
         void deleteCourt_Success() {
             when(lapanganRepository.findById(courtId)).thenReturn(Optional.of(testCourt));
             when(reservasiRepository.findOverlappingReservations(eq(courtId), any(), any(), any()))
@@ -363,6 +361,8 @@ class ReservasiServiceTest {
             when(reservasiRepository.findActiveReservationsDuringPeriod(any(), any(), any()))
                     .thenReturn(Collections.emptyList());
             when(alatOlahragaRepository.findById(equipId)).thenReturn(Optional.of(equipment));
+            when(alatOlahragaRepository.findByTypeInAndStatus(anyList(), eq(AlatOlahragaStatus.TERSEDIA)))
+                    .thenReturn(List.of(equipment));
             when(reservasiRepository.save(any(Reservasi.class))).thenAnswer(i -> {
                 Reservasi r = i.getArgument(0);
                 r.setId(UUID.randomUUID());
@@ -421,6 +421,8 @@ class ReservasiServiceTest {
             when(reservasiRepository.findActiveReservationsDuringPeriod(any(), any(), any()))
                     .thenReturn(Collections.emptyList());
             when(alatOlahragaRepository.findById(equipId)).thenReturn(Optional.of(equipment));
+            when(alatOlahragaRepository.findByTypeInAndStatus(anyList(), eq(AlatOlahragaStatus.TERSEDIA)))
+                    .thenReturn(List.of(equipment));
 
             assertThrows(BadRequestException.class,
                     () -> reservasiService.createReservation(request));

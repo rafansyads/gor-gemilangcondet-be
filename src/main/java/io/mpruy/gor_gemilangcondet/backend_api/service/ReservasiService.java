@@ -204,19 +204,33 @@ public class ReservasiService {
                 .flatMap(r -> r.getRentList().stream())
                 .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
 
-        return equipment.stream().map(e -> {
-            long rented = rentedCounts.getOrDefault(e.getId(), 0L);
-            long available = Math.max(0, e.getStock() - rented);
-            return AlatOlahragaAvailabilityResponse.builder()
-                    .id(e.getId())
-                    .name(e.getName())
-                    .type(e.getType())
-                    .price(e.getPrice())
-                    .totalStock(e.getStock())
-                    .rented(rented)
-                    .available(available)
-                    .build();
-        }).collect(Collectors.toList());
+        Map<AlatOlahragaType, List<AlatOlahraga>> groupedByType = equipment.stream()
+                .collect(Collectors.groupingBy(AlatOlahraga::getType));
+
+        return groupedByType.entrySet().stream()
+                .map(entry -> {
+                    List<AlatOlahraga> units = entry.getValue();
+                    AlatOlahraga representative = units.stream()
+                            .sorted(Comparator.comparing(AlatOlahraga::getName))
+                            .findFirst()
+                            .orElseThrow();
+
+                    long totalStock = units.stream().mapToLong(AlatOlahraga::getStock).sum();
+                    long rented = units.stream().mapToLong(u -> rentedCounts.getOrDefault(u.getId(), 0L)).sum();
+                    long available = Math.max(0, totalStock - rented);
+
+                    return AlatOlahragaAvailabilityResponse.builder()
+                            .id(representative.getId())
+                            .name(representative.getType().name())
+                            .type(representative.getType())
+                            .price(representative.getPrice())
+                            .totalStock(totalStock)
+                            .rented(rented)
+                            .available(available)
+                            .build();
+                })
+                .sorted(Comparator.comparing(AlatOlahragaAvailabilityResponse::getType))
+                .collect(Collectors.toList());
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -864,33 +878,44 @@ public class ReservasiService {
         double totalEquipmentCost = 0;
 
         for (RentItemRequest item : rentItems) {
-            AlatOlahraga equipment = alatOlahragaRepository.findById(item.getAlatOlahragaId())
+            AlatOlahraga equipmentAnchor = alatOlahragaRepository.findById(item.getAlatOlahragaId())
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "Alat olahraga tidak ditemukan: " + item.getAlatOlahragaId()));
 
-            if (equipment.getStatus() != AlatOlahragaStatus.TERSEDIA) {
+            if (equipmentAnchor.getStatus() != AlatOlahragaStatus.TERSEDIA) {
                 throw new BadRequestException(
-                        "Alat olahraga '" + equipment.getName() + "' sedang tidak tersedia");
+                        "Alat olahraga '" + equipmentAnchor.getName() + "' sedang tidak tersedia");
             }
 
-            long currentlyRented = rentedCounts.getOrDefault(equipment.getId(), 0L);
-            long available = equipment.getStock() - currentlyRented;
+            List<AlatOlahraga> sameTypeUnits = alatOlahragaRepository.findByTypeInAndStatus(
+                    List.of(equipmentAnchor.getType()),
+                    AlatOlahragaStatus.TERSEDIA);
+
+            List<UUID> allocatableUnits = new ArrayList<>();
+            for (AlatOlahraga unit : sameTypeUnits) {
+                long currentlyRented = rentedCounts.getOrDefault(unit.getId(), 0L);
+                long freeUnits = Math.max(0, unit.getStock() - currentlyRented);
+                for (int i = 0; i < freeUnits; i++) {
+                    allocatableUnits.add(unit.getId());
+                }
+            }
+
+            long available = allocatableUnits.size();
 
             if (item.getQuantity() > available) {
                 throw new BadRequestException(
                         String.format("Stok '%s' tidak mencukupi. Tersedia: %d, Diminta: %d",
-                                equipment.getName(), available, item.getQuantity()));
+                                equipmentAnchor.getType(), available, item.getQuantity()));
             }
 
-            // Expand to flat list (each UUID entry = 1 unit rented)
+            // Allocate concrete unit IDs for the requested quantity.
             for (int i = 0; i < item.getQuantity(); i++) {
-                expandedRentList.add(equipment.getId());
+                UUID allocatedUnitId = allocatableUnits.get(i);
+                expandedRentList.add(allocatedUnitId);
+                rentedCounts.merge(allocatedUnitId, 1L, Long::sum);
             }
 
-            // Track cumulative rentals for subsequent items of the same type
-            rentedCounts.merge(equipment.getId(), (long) item.getQuantity(), Long::sum);
-
-            totalEquipmentCost += equipment.getPrice() * item.getQuantity();
+            totalEquipmentCost += equipmentAnchor.getPrice() * item.getQuantity();
         }
 
         return totalEquipmentCost;

@@ -19,6 +19,6 @@ public interface BarangRepository extends JpaRepository<Barang, UUID> {
     @Query("SELECT b FROM Barang b WHERE b.id = :id")
     Optional<Barang> findByIdWithPessimisticLock(@Param("id") UUID id);
 
-    @Query("SELECT b FROM Barang b WHERE TYPE(b) = Barang ORDER BY b.name")
+    @Query("SELECT b FROM Barang b WHERE TYPE(b) <> AlatOlahraga ORDER BY b.name")
     List<Barang> findAllSellable();
 }
