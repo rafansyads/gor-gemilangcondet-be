@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,6 +30,7 @@ public class UserController {
     // ──────────────────────────────────────────────────────────────────────────
 
     @GetMapping
+    @PreAuthorize("hasAuthority('ADMIN')") // Only ADMIN can list all users
     public ResponseEntity<BaseResponseDto<List<UserDto>>> getAllUsers() {
         List<UserDto> users = userService.getAllUsers();
         return ResponseUtil.success(users, "Daftar pengguna berhasil diambil", HttpStatus.OK)
@@ -40,6 +42,8 @@ public class UserController {
     // ──────────────────────────────────────────────────────────────────────────
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('ADMIN') or #id == authentication.principal.id")
+    // ADMIN can access any user; users can access their own data
     public ResponseEntity<BaseResponseDto<UserDto>> getUserById(@PathVariable UUID id) {
         UserDto user = userService.getUserById(id);
         return ResponseUtil.success(user, "Pengguna berhasil diambil", HttpStatus.OK)
@@ -51,6 +55,8 @@ public class UserController {
     // ──────────────────────────────────────────────────────────────────────────
 
     @GetMapping("/by-username/{username}")
+    @PreAuthorize("hasAuthority('ADMIN') or #username == authentication.principal.username")
+    // ADMIN can access any user; users can access their own data
     public ResponseEntity<BaseResponseDto<UserDto>> getUserByUsername(@PathVariable String username) {
         UserDto user = userService.getUserByUsername(username);
         return ResponseUtil.success(user, "Pengguna berhasil diambil", HttpStatus.OK)
@@ -62,15 +68,15 @@ public class UserController {
     // ──────────────────────────────────────────────────────────────────────────
 
     /**
-     * Lists pending admin/staff registrations.
+     * Lists all the admin/staff users, regardless the status.
      * Only ADMIN can review these submissions.
      */
-    @GetMapping("/pending-admin-registrations")
+    @GetMapping("/admin-users")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ResponseEntity<BaseResponseDto<List<UserDto>>> getPendingAdminRegistrations() {
-        List<UserDto> pendingUsers = userService.getPendingAdminRegistrations();
+    public ResponseEntity<BaseResponseDto<List<UserDto>>> getAllAdminUsers() {
+        List<UserDto> adminUsers = userService.getAllAdminUsers();
         return ResponseUtil
-                .success(pendingUsers, "Daftar registrasi admin/staff pending berhasil diambil", HttpStatus.OK)
+                .success(adminUsers, "Daftar pengguna admin/staff berhasil diambil", HttpStatus.OK)
                 .toBuilder().build();
     }
 
@@ -79,7 +85,8 @@ public class UserController {
     // ──────────────────────────────────────────────────────────────────────────
 
     /**
-     * Approves a pending admin/staff registration (PENDING -> AKTIF).
+     * Approves a pending/suspended admin/staff registration (PENDING/SUSPENDED ->
+     * AKTIF).
      * Only ADMIN can perform this action.
      */
     @PatchMapping("/pending-admin-registrations/{id}/approve")
@@ -95,15 +102,34 @@ public class UserController {
     // ──────────────────────────────────────────────────────────────────────────
 
     /**
-     * Rejects a pending admin/staff registration by deleting the pending user.
+     * Rejects a pending/suspended admin/staff registration (PENDING/SUSPENDED ->
+     * BANNED). The banned user will be deleted from the database 3 days after the
+     * rejection.
      * Only ADMIN can perform this action.
      */
     @DeleteMapping("/pending-admin-registrations/{id}/reject")
     @PreAuthorize("hasAuthority('ADMIN')")
-    public ResponseEntity<BaseResponseDto<String>> rejectPendingAdminRegistration(@PathVariable UUID id) {
-        userService.rejectPendingAdminRegistration(id);
+    public ResponseEntity<BaseResponseDto<UserDto>> rejectPendingAdminRegistration(@PathVariable UUID id) {
+        UserDto rejected = userService.rejectPendingAdminRegistration(id);
         return ResponseUtil
-                .success("Registrasi pending ditolak", "Registrasi admin/staff berhasil ditolak", HttpStatus.OK)
+                .success(rejected, "Registrasi admin/staff berhasil ditolak", HttpStatus.OK)
+                .toBuilder().build();
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // PATCH /users/{id}/suspend
+    // ──────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Suspend a user account (AKTIF -> SUSPENDED). Suspended users cannot log in
+     * until their account is reactivated by an admin.
+     * Only ADMIN can perform this action.
+     */
+    @PatchMapping("/{id}/suspend")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ResponseEntity<BaseResponseDto<UserDto>> suspendUser(@PathVariable UUID id) {
+        UserDto suspended = userService.suspendUser(id);
+        return ResponseUtil.success(suspended, "Pengguna berhasil disuspend", HttpStatus.OK)
                 .toBuilder().build();
     }
 

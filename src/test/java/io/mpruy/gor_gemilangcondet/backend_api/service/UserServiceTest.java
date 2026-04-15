@@ -1,5 +1,33 @@
 package io.mpruy.gor_gemilangcondet.backend_api.service;
 
+import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.eq;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+
 import io.mpruy.gor_gemilangcondet.backend_api.dto.users.UserDto;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.users.requests.UpdateProfileRequest;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.users.responses.UpdateProfileResponse;
@@ -15,26 +43,6 @@ import io.mpruy.gor_gemilangcondet.backend_api.repository.UserStatusRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.security.UserDetailsImpl;
 import io.mpruy.gor_gemilangcondet.backend_api.security.jwt.JwtUtils;
 import io.mpruy.gor_gemilangcondet.backend_api.security.service.RefreshTokenService;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
-
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyCollection;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -59,11 +67,15 @@ class UserServiceTest {
     private Role guestRole;
     private UserStatus activeStatus;
     private UserStatus pendingStatus;
+    private UserStatus activeStatus;
+    private UserStatus pendingStatus;
 
     @BeforeEach
     void setUp() {
         userId = UUID.randomUUID();
         guestRole = Role.builder().id(1).roleName(RoleName.GUEST).build();
+        activeStatus = UserStatus.builder().id(1).name(UserStatusName.AKTIF).build();
+        pendingStatus = UserStatus.builder().id(2).name(UserStatusName.PENDING).build();
         activeStatus = UserStatus.builder().id(1).name(UserStatusName.AKTIF).build();
         pendingStatus = UserStatus.builder().id(2).name(UserStatusName.PENDING).build();
         testUser = User.builder()
@@ -72,13 +84,9 @@ class UserServiceTest {
                 .email("test@example.com")
                 .password("encoded")
                 .role(guestRole)
-            .status(activeStatus)
+                .status(activeStatus)
                 .build();
     }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    // GET ALL USERS
-    // ══════════════════════════════════════════════════════════════════════════
 
     @Nested
     @DisplayName("Get All Users Tests")
@@ -110,10 +118,6 @@ class UserServiceTest {
         }
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // GET USER BY ID
-    // ══════════════════════════════════════════════════════════════════════════
-
     @Nested
     @DisplayName("Get User By ID Tests")
     class GetUserByIdTests {
@@ -142,35 +146,34 @@ class UserServiceTest {
         }
     }
 
-        // ══════════════════════════════════════════════════════════════════════════
-        // PENDING ADMIN REGISTRATION REVIEW
-        // ══════════════════════════════════════════════════════════════════════════
-
-        @Nested
-        @DisplayName("Pending Admin Registration Tests")
-        class PendingAdminRegistrationTests {
+    @Nested
+    @DisplayName("Pending Admin Registration Tests")
+    class PendingAdminRegistrationTests {
 
         @Test
-        @DisplayName("Should return pending admin/staff registrations")
-        void getPendingAdminRegistrations_Success() {
+        @DisplayName("Should return admin-assignable users by allowed statuses")
+        void getAllAdminByAdminAssignableStatus_Success() {
             User pendingStaff = User.builder()
-                .id(UUID.randomUUID())
-                .username("staf_pending")
-                .email("staf_pending@test.com")
-                .password("encoded")
-                .role(Role.builder().id(3).roleName(RoleName.STAF_LAPANGAN).build())
-                .status(pendingStatus)
-                .build();
+                    .id(UUID.randomUUID())
+                    .username("staf_pending")
+                    .email("staf_pending@test.com")
+                    .password("encoded")
+                    .role(Role.builder().id(3).roleName(RoleName.STAF_LAPANGAN).build())
+                    .status(pendingStatus)
+                    .build();
 
-            when(userRepository.findByStatus_NameAndRole_RoleNameIn(
-                    eq(UserStatusName.PENDING), anyCollection()))
-                .thenReturn(List.of(pendingStaff));
+            when(userRepository.findByStatus_NameInAndRole_RoleNameIn(anyCollection(), anyCollection()))
+                    .thenReturn(List.of(pendingStaff));
 
-            List<UserDto> result = userService.getPendingAdminRegistrations();
+            List<UserDto> result = userService.getAllAdminByAdminAssignableStatus();
 
             assertEquals(1, result.size());
             assertEquals("staf_pending", result.get(0).getUsername());
             assertEquals(UserStatusName.PENDING.name(), result.get(0).getStatus());
+            verify(userRepository).findByStatus_NameInAndRole_RoleNameIn(
+                    eq(Set.of(UserStatusName.PENDING, UserStatusName.SUSPENDED, UserStatusName.BANNED,
+                            UserStatusName.AKTIF)),
+                    anyCollection());
         }
 
         @Test
@@ -178,45 +181,51 @@ class UserServiceTest {
         void approvePendingAdminRegistration_Success() {
             UUID pendingId = UUID.randomUUID();
             User pendingStaff = User.builder()
-                .id(pendingId)
-                .username("staf_pending")
-                .email("staf_pending@test.com")
-                .password("encoded")
-                .role(Role.builder().id(3).roleName(RoleName.STAF_LAPANGAN).build())
-                .status(pendingStatus)
-                .build();
+                    .id(pendingId)
+                    .username("staf_pending")
+                    .email("staf_pending@test.com")
+                    .password("encoded")
+                    .role(Role.builder().id(3).roleName(RoleName.STAF_LAPANGAN).build())
+                    .status(pendingStatus)
+                    .build();
 
-            when(userRepository.findByIdAndStatus_NameAndRole_RoleNameIn(
-                    eq(pendingId), eq(UserStatusName.PENDING), anyCollection()))
-                .thenReturn(Optional.of(pendingStaff));
-                when(userStatusRepository.findByName(UserStatusName.AKTIF)).thenReturn(Optional.of(activeStatus));
+            when(userRepository.findByIdAndStatus_NameInAndRole_RoleNameIn(
+                    eq(pendingId), anyCollection(), anyCollection()))
+                    .thenReturn(Optional.of(pendingStaff));
+            when(userStatusRepository.findByName(UserStatusName.AKTIF)).thenReturn(Optional.of(activeStatus));
             when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
 
             UserDto result = userService.approvePendingAdminRegistration(pendingId);
 
             assertEquals(UserStatusName.AKTIF.name(), result.getStatus());
+            assertNull(pendingStaff.getBannedAt());
         }
 
         @Test
         @DisplayName("Should reject pending admin/staff registration")
         void rejectPendingAdminRegistration_Success() {
             UUID pendingId = UUID.randomUUID();
+            UserStatus bannedStatus = UserStatus.builder().id(3).name(UserStatusName.BANNED).build();
             User pendingStaff = User.builder()
-                .id(pendingId)
-                .username("staf_pending")
-                .email("staf_pending@test.com")
-                .password("encoded")
-                .role(Role.builder().id(3).roleName(RoleName.STAF_LAPANGAN).build())
-                .status(pendingStatus)
-                .build();
+                    .id(pendingId)
+                    .username("staf_pending")
+                    .email("staf_pending@test.com")
+                    .password("encoded")
+                    .role(Role.builder().id(3).roleName(RoleName.STAF_LAPANGAN).build())
+                    .status(pendingStatus)
+                    .build();
 
-            when(userRepository.findByIdAndStatus_NameAndRole_RoleNameIn(
-                    eq(pendingId), eq(UserStatusName.PENDING), anyCollection()))
-                .thenReturn(Optional.of(pendingStaff));
+            when(userRepository.findByIdAndStatus_NameInAndRole_RoleNameIn(
+                    eq(pendingId), anyCollection(), anyCollection()))
+                    .thenReturn(Optional.of(pendingStaff));
+            when(userStatusRepository.findByName(UserStatusName.BANNED)).thenReturn(Optional.of(bannedStatus));
+            when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
 
-            userService.rejectPendingAdminRegistration(pendingId);
+            UserDto result = userService.rejectPendingAdminRegistration(pendingId);
 
-            verify(userRepository).delete(pendingStaff);
+            assertEquals(UserStatusName.BANNED.name(), result.getStatus());
+            assertNotNull(pendingStaff.getBannedAt());
+            verify(userRepository).save(pendingStaff);
         }
 
         @Test
@@ -224,18 +233,38 @@ class UserServiceTest {
         void approvePendingAdminRegistration_NotFound() {
             UUID pendingId = UUID.randomUUID();
 
-            when(userRepository.findByIdAndStatus_NameAndRole_RoleNameIn(
-                    eq(pendingId), eq(UserStatusName.PENDING), anyCollection()))
-                .thenReturn(Optional.empty());
+            when(userRepository.findByIdAndStatus_NameInAndRole_RoleNameIn(
+                    eq(pendingId), anyCollection(), anyCollection()))
+                    .thenReturn(Optional.empty());
 
             assertThrows(ResourceNotFoundException.class,
-                () -> userService.approvePendingAdminRegistration(pendingId));
-        }
+                    () -> userService.approvePendingAdminRegistration(pendingId));
         }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // GET USER BY USERNAME
-    // ══════════════════════════════════════════════════════════════════════════
+        @Test
+        @DisplayName("Should delete banned users older than 3 days")
+        void deleteExpiredBannedUsers_Success() {
+            User oldBanned = User.builder()
+                    .id(UUID.randomUUID())
+                    .username("old_banned")
+                    .email("old_banned@test.com")
+                    .password("encoded")
+                    .role(Role.builder().id(3).roleName(RoleName.STAF_LAPANGAN).build())
+                    .status(UserStatus.builder().id(3).name(UserStatusName.BANNED).build())
+                    .bannedAt(LocalDateTime.now().minusDays(4))
+                    .build();
+
+            when(userRepository.findByStatus_NameAndBannedAtLessThanEqual(eq(UserStatusName.BANNED),
+                    any(LocalDateTime.class)))
+                    .thenReturn(List.of(oldBanned));
+
+            int deleted = userService.deleteExpiredBannedUsers();
+
+            assertEquals(1, deleted);
+            verify(refreshTokenService).deleteRefreshTokenByUsername("old_banned");
+            verify(userRepository).deleteAllInBatch(List.of(oldBanned));
+        }
+    }
 
     @Nested
     @DisplayName("Get User By Username Tests")
@@ -261,10 +290,6 @@ class UserServiceTest {
                     () -> userService.getUserByUsername("nonexistent"));
         }
     }
-
-    // ══════════════════════════════════════════════════════════════════════════
-    // UPDATE PROFILE
-    // ══════════════════════════════════════════════════════════════════════════
 
     @Nested
     @DisplayName("Update Profile Tests")
