@@ -2,7 +2,6 @@ package io.mpruy.gor_gemilangcondet.backend_api.config;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.UUID;
 
 import jakarta.persistence.EntityManager;
 import org.springframework.boot.ApplicationArguments;
@@ -13,10 +12,10 @@ import org.springframework.transaction.annotation.Transactional;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.Lapangan;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.LapanganStatus;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.LapanganType;
-import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.AlatOlahraga;
-import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.AlatOlahragaStatus;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.Barang;
-import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.BarangType;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.alat_olahraga.AlatOlahraga;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.alat_olahraga.AlatOlahragaStatus;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.alat_olahraga.AlatOlahragaType;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.Role;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.RoleName;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.UserStatus;
@@ -126,12 +125,12 @@ public class DataSeeder implements ApplicationRunner {
      * without creating duplicate entries. It ensures that the application always
      * has the necessary equipment defined for proper reservation handling.
      * 
-     * @see BarangType
+     * @see AlatOlahragaType
      * @see AlatOlahragaStatus
      * @see AlatOlahragaRepository
      */
     private void seedAlatOlahragaTypes() {
-        for (BarangType type : BarangType.values()) {
+        for (AlatOlahragaType type : AlatOlahragaType.values()) {
             if (alatOlahragaRepository.findByTypeIn(List.of(type)).isEmpty()) {
                 LocalDateTime now = LocalDateTime.now();
                 AlatOlahraga alat = AlatOlahraga.builder()
@@ -226,7 +225,7 @@ public class DataSeeder implements ApplicationRunner {
 
         LocalDateTime now = LocalDateTime.now();
         List<AlatOlahraga> equipment = List.of(
-                AlatOlahraga.builder().name("Raket Badminton Premium").type(BarangType.RAKET)
+                AlatOlahraga.builder().name("Raket Badminton Premium").type(AlatOlahragaType.RAKET)
                         .stock(20).price(25000).status(AlatOlahragaStatus.TERSEDIA)
                         .createdAt(now).updatedAt(now).build());
 
@@ -243,41 +242,45 @@ public class DataSeeder implements ApplicationRunner {
      */
     @Transactional
     public void seedBarangJual() {
-        boolean hasMakanan = barangRepository.findAll().stream()
-                .anyMatch(b -> b.getType() == BarangType.MAKANAN || b.getType() == BarangType.MINUMAN);
-        if (hasMakanan)
+        List<String> sellableNames = List.of(
+                "Nasi Goreng", "Mie Goreng", "Roti Bakar", "Kentang Goreng",
+                "Raket Yonex", "Raket Li-Ning",
+                "Teh Botol", "Air Mineral", "Kopi Hitam", "Es Jeruk", "Pocari Sweat");
+        boolean hasSellableItems = barangRepository.findAll().stream()
+                .anyMatch(b -> sellableNames.contains(b.getName()));
+        if (hasSellableItems)
             return;
 
         LocalDateTime now = LocalDateTime.now();
         List<Barang> items = List.of(
                 // Makanan
-                Barang.builder().name("Nasi Goreng").type(BarangType.MAKANAN)
+                Barang.builder().name("Nasi Goreng")
                         .stock(50).price(15000).createdAt(now).updatedAt(now).build(),
-                Barang.builder().name("Mie Goreng").type(BarangType.MAKANAN)
+                Barang.builder().name("Mie Goreng")
                         .stock(50).price(12000).createdAt(now).updatedAt(now).build(),
-                Barang.builder().name("Roti Bakar").type(BarangType.MAKANAN)
+                Barang.builder().name("Roti Bakar")
                         .stock(30).price(10000).createdAt(now).updatedAt(now).build(),
-                Barang.builder().name("Kentang Goreng").type(BarangType.MAKANAN)
+                Barang.builder().name("Kentang Goreng")
                         .stock(40).price(12000).createdAt(now).updatedAt(now).build(),
                 // Raket (dijual, bukan disewa)
-                Barang.builder().name("Raket Yonex").type(BarangType.RAKET)
+                Barang.builder().name("Raket Yonex")
                         .stock(10).price(450000).createdAt(now).updatedAt(now).build(),
-                Barang.builder().name("Raket Li-Ning").type(BarangType.RAKET)
+                Barang.builder().name("Raket Li-Ning")
                         .stock(8).price(350000).createdAt(now).updatedAt(now).build(),
                 // Minuman
-                Barang.builder().name("Teh Botol").type(BarangType.MINUMAN)
+                Barang.builder().name("Teh Botol")
                         .stock(100).price(7000).createdAt(now).updatedAt(now).build(),
-                Barang.builder().name("Air Mineral").type(BarangType.MINUMAN)
+                Barang.builder().name("Air Mineral")
                         .stock(100).price(5000).createdAt(now).updatedAt(now).build(),
-                Barang.builder().name("Kopi Hitam").type(BarangType.MINUMAN)
+                Barang.builder().name("Kopi Hitam")
                         .stock(60).price(10000).createdAt(now).updatedAt(now).build(),
-                Barang.builder().name("Es Jeruk").type(BarangType.MINUMAN)
+                Barang.builder().name("Es Jeruk")
                         .stock(60).price(8000).createdAt(now).updatedAt(now).build(),
-                Barang.builder().name("Pocari Sweat").type(BarangType.MINUMAN)
+                Barang.builder().name("Pocari Sweat")
                         .stock(80).price(10000).createdAt(now).updatedAt(now).build());
 
         barangRepository.saveAll(items);
-        items.forEach(b -> log.info("Seeded barang jual: {} ({}) - stok: {} - harga: {}",
-                b.getName(), b.getType(), b.getStock(), b.getPrice()));
+        items.forEach(b -> log.info("Seeded barang jual: {} - stok: {} - harga: {}",
+                b.getName(), b.getStock(), b.getPrice()));
     }
 }

@@ -7,9 +7,9 @@ import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.requests.Resched
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.requests.UpdateLapanganRequest;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.responses.*;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.*;
-import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.AlatOlahraga;
-import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.AlatOlahragaStatus;
-import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.BarangType;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.alat_olahraga.AlatOlahraga;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.alat_olahraga.AlatOlahragaStatus;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.alat_olahraga.AlatOlahragaType;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.BadRequestException;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.ResourceNotFoundException;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.AlatOlahragaRepository;
@@ -151,8 +151,6 @@ class ReservasiServiceTest {
             assertEquals("Updated", result.getName());
             assertEquals(LapanganType.BADMINTON, result.getType());
         }
-
-
 
         @Test
         @DisplayName("Should delete court with no active reservations")
@@ -357,7 +355,7 @@ class ReservasiServiceTest {
             equipment.setName("Raket");
             equipment.setStock(5);
             equipment.setPrice(15000);
-            equipment.setType(BarangType.RAKET);
+            equipment.setType(AlatOlahragaType.RAKET);
 
             when(lapanganRepository.findByIdWithPessimisticLock(courtId)).thenReturn(Optional.of(testCourt));
             when(reservasiRepository.findOverlappingReservations(eq(courtId), any(), any(), any()))
@@ -415,7 +413,7 @@ class ReservasiServiceTest {
             equipment.setName("Raket");
             equipment.setStock(5);
             equipment.setPrice(15000);
-            equipment.setType(BarangType.RAKET);
+            equipment.setType(AlatOlahragaType.RAKET);
 
             when(lapanganRepository.findByIdWithPessimisticLock(courtId)).thenReturn(Optional.of(testCourt));
             when(reservasiRepository.findOverlappingReservations(eq(courtId), any(), any(), any()))
@@ -444,7 +442,7 @@ class ReservasiServiceTest {
             equipment.setName("Raket");
             equipment.setStock(5);
             equipment.setPrice(15000);
-            equipment.setType(BarangType.RAKET);
+            equipment.setType(AlatOlahragaType.RAKET);
 
             when(lapanganRepository.findByIdWithPessimisticLock(courtId)).thenReturn(Optional.of(testCourt));
             when(reservasiRepository.findOverlappingReservations(eq(courtId), any(), any(), any()))
@@ -755,7 +753,7 @@ class ReservasiServiceTest {
             raket.setName("Raket");
             raket.setStock(10);
             raket.setPrice(15000);
-            raket.setType(BarangType.RAKET);
+            raket.setType(AlatOlahragaType.RAKET);
 
             when(alatOlahragaRepository.findByTypeInAndStatus(anyList(), eq(AlatOlahragaStatus.TERSEDIA)))
                     .thenReturn(List.of(raket));

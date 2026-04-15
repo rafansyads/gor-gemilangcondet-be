@@ -31,10 +31,6 @@ public class Barang {
     @Column(nullable = false)
     private long stock;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private BarangType type;
-
     @Column(nullable = false)
     private double price;
 }
