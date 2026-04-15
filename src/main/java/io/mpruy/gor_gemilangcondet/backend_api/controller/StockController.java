@@ -59,23 +59,25 @@ public class StockController {
 
     @PreAuthorize("hasAnyAuthority('STAF_LAPANGAN', 'STAF_TOKO', 'OWNER', 'ADMIN')")
     @GetMapping("/export")
-    public ResponseEntity<byte[]> exportOverviewCsv() {
+    public ResponseEntity<BaseResponseDto<byte[]>> exportOverviewCsv() {
         byte[] csv = stockService.exportStockOverviewCsv();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(new MediaType("text", "csv"));
         headers.setContentDisposition(ContentDisposition.attachment().filename("stock-overview.csv").build());
-        return new ResponseEntity<>(csv, headers, HttpStatus.OK);
+        return ResponseUtil.success(csv, "Data stok berhasil diekspor", HttpStatus.OK)
+                .toBuilder().headers(headers).build();
     }
 
     @PreAuthorize("hasAnyAuthority('STAF_LAPANGAN', 'STAF_TOKO', 'OWNER', 'ADMIN')")
     @GetMapping("/{barangId}/card/export")
-    public ResponseEntity<byte[]> exportStockCardCsv(@PathVariable UUID barangId) {
+    public ResponseEntity<BaseResponseDto<byte[]>> exportStockCardCsv(@PathVariable UUID barangId) {
         byte[] csv = stockService.exportStockCardCsv(barangId);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(new MediaType("text", "csv"));
         headers.setContentDisposition(
                 ContentDisposition.attachment().filename("stock-card-" + barangId + ".csv").build());
-        return new ResponseEntity<>(csv, headers, HttpStatus.OK);
+        return ResponseUtil.success(csv, "Data stok berhasil diekspor", HttpStatus.OK)
+                .toBuilder().headers(headers).build();
     }
 
     private UUID getAuthenticatedUserId() {

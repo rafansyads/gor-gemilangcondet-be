@@ -29,6 +29,7 @@ public class TransaksiService {
     private final TransaksiRepository transaksiRepository;
     private final BarangRepository barangRepository;
     private final StockService stockService;
+    private final StockMutationService stockMutationService;
 
     @Transactional
     public TransaksiResponse checkout(CheckoutRequest request, UUID staffId) {
@@ -59,7 +60,7 @@ public class TransaksiService {
             barang.setStock(barang.getStock() - item.getKuantitas());
             barang.setUpdatedAt(LocalDateTime.now());
 
-            stockService.recordMutation(
+            stockMutationService.recordMutation(
                     barang,
                     StockMutationDirection.OUT,
                     item.getKuantitas(),
