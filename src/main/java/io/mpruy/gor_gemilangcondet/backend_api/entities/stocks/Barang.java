@@ -35,6 +35,16 @@ public class Barang {
     @Column(nullable = false)
     private BarangType type;
 
+    @Column(unique = true, nullable = false)
+    private String sku;
+
+    @Column(nullable = false)
+    private double purchasePrice;
+
     @Column(nullable = false)
     private double price;
+
+    private String unit;
+
+    private String imageUrl;
 }

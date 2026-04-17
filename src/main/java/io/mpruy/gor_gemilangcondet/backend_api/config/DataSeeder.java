@@ -51,6 +51,7 @@ public class DataSeeder implements ApplicationRunner {
     private final EntityManager entityManager;
 
     @Override
+    @Transactional
     public void run(ApplicationArguments args) {
         seedUserStatuses();
         seedRoles();
@@ -226,8 +227,8 @@ public class DataSeeder implements ApplicationRunner {
 
         LocalDateTime now = LocalDateTime.now();
         List<AlatOlahraga> equipment = List.of(
-                AlatOlahraga.builder().name("Raket Badminton Premium").type(BarangType.RAKET)
-                        .stock(20).price(25000).status(AlatOlahragaStatus.TERSEDIA)
+                AlatOlahraga.builder().name("Raket Badminton Premium").sku("RKT-SEWA-001").type(BarangType.RAKET_SENAR)
+                        .stock(20).price(25000).purchasePrice(150000).unit("Pcs").status(AlatOlahragaStatus.TERSEDIA)
                         .createdAt(now).updatedAt(now).build());
 
         alatOlahragaRepository.saveAll(equipment);
@@ -251,30 +252,30 @@ public class DataSeeder implements ApplicationRunner {
         LocalDateTime now = LocalDateTime.now();
         List<Barang> items = List.of(
                 // Makanan
-                Barang.builder().name("Nasi Goreng").type(BarangType.MAKANAN)
-                        .stock(50).price(15000).createdAt(now).updatedAt(now).build(),
-                Barang.builder().name("Mie Goreng").type(BarangType.MAKANAN)
-                        .stock(50).price(12000).createdAt(now).updatedAt(now).build(),
-                Barang.builder().name("Roti Bakar").type(BarangType.MAKANAN)
-                        .stock(30).price(10000).createdAt(now).updatedAt(now).build(),
-                Barang.builder().name("Kentang Goreng").type(BarangType.MAKANAN)
-                        .stock(40).price(12000).createdAt(now).updatedAt(now).build(),
-                // Raket (dijual, bukan disewa)
-                Barang.builder().name("Raket Yonex").type(BarangType.RAKET)
-                        .stock(10).price(450000).createdAt(now).updatedAt(now).build(),
-                Barang.builder().name("Raket Li-Ning").type(BarangType.RAKET)
-                        .stock(8).price(350000).createdAt(now).updatedAt(now).build(),
+                Barang.builder().name("Nasi Goreng").sku("MKN-001").type(BarangType.MAKANAN)
+                        .stock(50).price(15000).purchasePrice(8000).unit("Porsi").createdAt(now).updatedAt(now).build(),
+                Barang.builder().name("Mie Goreng").sku("MKN-002").type(BarangType.MAKANAN)
+                        .stock(50).price(12000).purchasePrice(6000).unit("Porsi").createdAt(now).updatedAt(now).build(),
+                Barang.builder().name("Roti Bakar").sku("MKN-003").type(BarangType.MAKANAN)
+                        .stock(30).price(10000).purchasePrice(5000).unit("Porsi").createdAt(now).updatedAt(now).build(),
+                Barang.builder().name("Kentang Goreng").sku("MKN-004").type(BarangType.MAKANAN)
+                        .stock(40).price(12000).purchasePrice(6000).unit("Porsi").createdAt(now).updatedAt(now).build(),
+                // Raket & Senar (dijual, bukan disewa)
+                Barang.builder().name("Raket Yonex").sku("RKT-YNX-001").type(BarangType.RAKET_SENAR)
+                        .stock(10).price(450000).purchasePrice(250000).unit("Pcs").createdAt(now).updatedAt(now).build(),
+                Barang.builder().name("Raket Li-Ning").sku("RKT-LN-001").type(BarangType.RAKET_SENAR)
+                        .stock(8).price(350000).purchasePrice(180000).unit("Pcs").createdAt(now).updatedAt(now).build(),
                 // Minuman
-                Barang.builder().name("Teh Botol").type(BarangType.MINUMAN)
-                        .stock(100).price(7000).createdAt(now).updatedAt(now).build(),
-                Barang.builder().name("Air Mineral").type(BarangType.MINUMAN)
-                        .stock(100).price(5000).createdAt(now).updatedAt(now).build(),
-                Barang.builder().name("Kopi Hitam").type(BarangType.MINUMAN)
-                        .stock(60).price(10000).createdAt(now).updatedAt(now).build(),
-                Barang.builder().name("Es Jeruk").type(BarangType.MINUMAN)
-                        .stock(60).price(8000).createdAt(now).updatedAt(now).build(),
-                Barang.builder().name("Pocari Sweat").type(BarangType.MINUMAN)
-                        .stock(80).price(10000).createdAt(now).updatedAt(now).build());
+                Barang.builder().name("Teh Botol").sku("MNM-001").type(BarangType.MINUMAN)
+                        .stock(100).price(7000).purchasePrice(4000).unit("Botol").createdAt(now).updatedAt(now).build(),
+                Barang.builder().name("Air Mineral").sku("MNM-002").type(BarangType.MINUMAN)
+                        .stock(100).price(5000).purchasePrice(2500).unit("Botol").createdAt(now).updatedAt(now).build(),
+                Barang.builder().name("Kopi Hitam").sku("MNM-003").type(BarangType.MINUMAN)
+                        .stock(60).price(10000).purchasePrice(5000).unit("Gelas").createdAt(now).updatedAt(now).build(),
+                Barang.builder().name("Es Jeruk").sku("MNM-004").type(BarangType.MINUMAN)
+                        .stock(60).price(8000).purchasePrice(4000).unit("Gelas").createdAt(now).updatedAt(now).build(),
+                Barang.builder().name("Pocari Sweat").sku("MNM-005").type(BarangType.MINUMAN)
+                        .stock(80).price(10000).purchasePrice(6000).unit("Botol").createdAt(now).updatedAt(now).build());
 
         barangRepository.saveAll(items);
         items.forEach(b -> log.info("Seeded barang jual: {} ({}) - stok: {} - harga: {}",

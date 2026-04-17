@@ -61,6 +61,10 @@ public class WebSecurityConfig {
                         // Court images & payment proof images — publik (no auth needed)
                         .requestMatchers(HttpMethod.GET, "/payments/proof/**", "/api/payments/proof/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/courts/image/**", "/api/courts/image/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/products/**", "/api/products/**").permitAll()
+
+                        // Barang / Produk API
+                        .requestMatchers("/barang/**", "/api/barang/**").permitAll()
 
                         // Static files & H2 console (dev)
                         .requestMatchers("/", "/api", "/test-schedule.html", "/api/test-schedule.html", "/*.html",
