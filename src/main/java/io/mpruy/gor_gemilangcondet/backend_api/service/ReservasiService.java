@@ -50,7 +50,7 @@ public class ReservasiService {
 
         /** Mapping from court type to compatible equipment types for rental. */
         private static final Map<LapanganType, List<BarangType>> COURT_EQUIPMENT_MAP = Map.of(
-                        LapanganType.BADMINTON, List.of(BarangType.RAKET));
+                        LapanganType.BADMINTON, List.of(BarangType.RAKET_SENAR));
 
         // ──────────────────────────────────────────────────────────────────────────
         // Get All Courts
