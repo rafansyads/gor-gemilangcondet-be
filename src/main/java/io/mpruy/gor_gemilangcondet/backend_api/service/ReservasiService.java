@@ -10,6 +10,7 @@ import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.BarangType;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.BadRequestException;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.ResourceNotFoundException;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.AlatOlahragaRepository;
+import io.mpruy.gor_gemilangcondet.backend_api.repository.LapanganLogRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.LapanganRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.ReservasiRepository;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,7 @@ public class ReservasiService {
         private final LapanganRepository lapanganRepository;
         private final ReservasiRepository reservasiRepository;
         private final AlatOlahragaRepository alatOlahragaRepository;
+        private final LapanganLogRepository lapanganLogRepository;
 
         private static final ZoneId ZONE_JAKARTA = ZoneId.of("Asia/Jakarta");
         private static final int OPENING_HOUR = 6;
@@ -68,6 +70,13 @@ public class ReservasiService {
                                 .sorted(Comparator.comparing(Lapangan::getName))
                                 .map(this::toLapanganResponse)
                                 .collect(Collectors.toList());
+        }
+
+        @Transactional(readOnly = true)
+        public LapanganResponse getCourt(UUID id) {
+                Lapangan lapangan = lapanganRepository.findById(id)
+                                .orElseThrow(() -> new ResourceNotFoundException("Lapangan tidak ditemukan: " + id));
+                return toLapanganResponse(lapangan);
         }
 
         // ──────────────────────────────────────────────────────────────────────────
@@ -631,6 +640,34 @@ public class ReservasiService {
         public LapanganResponse updateCourt(UUID id, UpdateLapanganRequest request) {
                 Lapangan lapangan = lapanganRepository.findById(id)
                                 .orElseThrow(() -> new ResourceNotFoundException("Lapangan tidak ditemukan: " + id));
+
+                List<String> changes = new ArrayList<>();
+                if (!java.util.Objects.equals(lapangan.getName(), request.getName())) {
+                        changes.add("Nama: " + lapangan.getName() + " -> " + request.getName());
+                }
+                if (lapangan.getType() != request.getType()) {
+                        changes.add("Tipe: " + lapangan.getType() + " -> " + request.getType());
+                }
+                if (lapangan.getTarifPerJam() != request.getTarifPerJam()) {
+                        changes.add(String.format("Harga: Rp %,.0f -> Rp %,.0f", lapangan.getTarifPerJam(), request.getTarifPerJam()));
+                }
+                if (!java.util.Objects.equals(lapangan.getJenisLantai(), request.getJenisLantai())) {
+                        changes.add("Lantai: " + lapangan.getJenisLantai() + " -> " + request.getJenisLantai());
+                }
+                List<String> oldFasilitas = lapangan.getFasilitas() != null ? lapangan.getFasilitas() : List.of();
+                List<String> newFasilitas = request.getFasilitas() != null ? request.getFasilitas() : List.of();
+                if (!oldFasilitas.equals(newFasilitas)) {
+                        List<String> added = new ArrayList<>(newFasilitas);
+                        added.removeAll(oldFasilitas);
+                        List<String> removed = new ArrayList<>(oldFasilitas);
+                        removed.removeAll(newFasilitas);
+                        
+                        List<String> facChanges = new ArrayList<>();
+                        if (!added.isEmpty()) facChanges.add("+ " + String.join(", ", added));
+                        if (!removed.isEmpty()) facChanges.add("- " + String.join(", ", removed));
+                        changes.add("Fasilitas: " + String.join(", ", facChanges));
+                }
+
                 lapangan.setName(request.getName());
                 lapangan.setType(request.getType());
                 lapangan.setTarifPerJam(request.getTarifPerJam());
@@ -640,7 +677,47 @@ public class ReservasiService {
                 }
                 lapangan.setUpdatedAt(LocalDateTime.now(ZONE_JAKARTA));
                 lapanganRepository.save(lapangan);
+
+                // Add log if there are changes
+                if (!changes.isEmpty()) {
+                        String desc = String.join(" | ", changes);
+                        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+                        UUID userId = null;
+                        String username = "System";
+                        if (auth != null && auth.getPrincipal() instanceof io.mpruy.gor_gemilangcondet.backend_api.security.UserDetailsImpl) {
+                                io.mpruy.gor_gemilangcondet.backend_api.security.UserDetailsImpl userDetails = (io.mpruy.gor_gemilangcondet.backend_api.security.UserDetailsImpl) auth.getPrincipal();
+                                userId = userDetails.getId();
+                                username = userDetails.getUsername();
+                        }
+                        LapanganLog log = LapanganLog.builder()
+                                .lapanganId(lapangan.getId())
+                                .userId(userId)
+                                .username(username)
+                                .changeDescription(desc)
+                                .createdAt(lapangan.getUpdatedAt())
+                                .build();
+                        lapanganLogRepository.save(log);
+                }
+
                 return toLapanganResponse(lapangan);
+        }
+
+        @Transactional(readOnly = true)
+        public List<LapanganLogResponse> getCourtLogs(UUID id) {
+                return lapanganLogRepository.findByLapanganIdOrderByCreatedAtDesc(id).stream()
+                        .map(this::toLapanganLogResponse)
+                        .collect(Collectors.toList());
+        }
+
+        private LapanganLogResponse toLapanganLogResponse(LapanganLog log) {
+                return LapanganLogResponse.builder()
+                        .id(log.getId())
+                        .lapanganId(log.getLapanganId())
+                        .userId(log.getUserId())
+                        .username(log.getUsername())
+                        .changeDescription(log.getChangeDescription())
+                        .createdAt(log.getCreatedAt())
+                        .build();
         }
 
         @Transactional
@@ -680,16 +757,24 @@ public class ReservasiService {
                         String filename = "court-" + id + "-" + System.currentTimeMillis() + ext;
                         java.nio.file.Path uploadPath = java.nio.file.Paths.get("uploads/court-images");
                         java.nio.file.Files.createDirectories(uploadPath);
+
+                        // Delete the old image file if it exists to avoid orphaned files on disk
+                        if (lapangan.getImageUrl() != null) {
+                                java.nio.file.Path oldFile = uploadPath.resolve(lapangan.getImageUrl());
+                                try { java.nio.file.Files.deleteIfExists(oldFile); } catch (Exception ignored) {}
+                        }
+
                         java.nio.file.Path filePath = uploadPath.resolve(filename);
                         java.nio.file.Files.copy(file.getInputStream(), filePath,
                                         java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                         lapangan.setImageUrl(filename);
                         lapangan.setUpdatedAt(LocalDateTime.now(ZONE_JAKARTA));
-                        lapanganRepository.save(lapangan);
+                        // Use saveAndFlush so imageUrl is written to DB immediately
+                        Lapangan saved = lapanganRepository.saveAndFlush(lapangan);
+                        return toLapanganResponse(saved);
                 } catch (Exception e) {
                         throw new BadRequestException("Gagal mengunggah gambar: " + e.getMessage());
                 }
-                return toLapanganResponse(lapangan);
         }
 
         // ──────────────────────────────────────────────────────────────────────────

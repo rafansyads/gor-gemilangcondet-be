@@ -5,6 +5,7 @@ import io.mpruy.gor_gemilangcondet.backend_api.dto.BaseResponseDto;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.requests.CreateLapanganRequest;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.requests.UpdateLapanganRequest;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.responses.LapanganResponse;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.responses.LapanganLogResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.LapanganStatus;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.LapanganType;
 import io.mpruy.gor_gemilangcondet.backend_api.service.ReservasiService;
@@ -52,6 +53,14 @@ public class LapanganController {
             @Validated @RequestBody BaseRequestDto<CreateLapanganRequest> request) {
         LapanganResponse response = reservasiService.createCourt(request.getData());
         return ResponseUtil.success(response, "Lapangan berhasil ditambahkan", HttpStatus.CREATED)
+                .toBuilder().build();
+    }
+
+    // GET /courts/{id}
+    @GetMapping("/{id}")
+    public ResponseEntity<BaseResponseDto<LapanganResponse>> getCourt(@PathVariable UUID id) {
+        LapanganResponse response = reservasiService.getCourt(id);
+        return ResponseUtil.success(response, "Data lapangan berhasil diambil", HttpStatus.OK)
                 .toBuilder().build();
     }
 
@@ -113,6 +122,15 @@ public class LapanganController {
             @RequestParam LapanganStatus status) {
         LapanganResponse response = reservasiService.updateCourtStatus(id, status);
         return ResponseUtil.success(response, "Status lapangan berhasil diperbarui", HttpStatus.OK)
+                .toBuilder().build();
+    }
+
+    // GET /courts/{id}/logs
+    @PreAuthorize("hasAnyAuthority('ADMIN', 'STAF_LAPANGAN')")
+    @GetMapping("/{id}/logs")
+    public ResponseEntity<BaseResponseDto<List<LapanganLogResponse>>> getCourtLogs(@PathVariable UUID id) {
+        List<LapanganLogResponse> logs = reservasiService.getCourtLogs(id);
+        return ResponseUtil.success(logs, "Riwayat perubahan lapangan berhasil diambil", HttpStatus.OK)
                 .toBuilder().build();
     }
 }
