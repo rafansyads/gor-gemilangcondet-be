@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.UUID;
 
 @Entity
@@ -14,6 +15,8 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 public class User {
+
+    private static final ZoneId ZONE_JAKARTA = ZoneId.of("Asia/Jakarta");
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -39,4 +42,19 @@ public class User {
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "status_id", nullable = false)
     private UserStatus status;
+
+    /** Timestamp of when account was marked BANNED; null otherwise. */
+    private LocalDateTime bannedAt;
+
+    @PrePersist
+    @PreUpdate
+    private void syncBannedTimestamp() {
+        if (status != null && status.getName() == UserStatusName.BANNED) {
+            if (bannedAt == null) {
+                bannedAt = LocalDateTime.now(ZONE_JAKARTA);
+            }
+            return;
+        }
+        bannedAt = null;
+    }
 }

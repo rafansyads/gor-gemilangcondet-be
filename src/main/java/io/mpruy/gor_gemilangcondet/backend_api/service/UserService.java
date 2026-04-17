@@ -22,6 +22,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -34,6 +36,7 @@ public class UserService {
     private final UserStatusRepository userStatusRepository;
     private final JwtUtils jwtUtils;
     private final RefreshTokenService refreshTokenService;
+    private static final ZoneId ZONE_JAKARTA = ZoneId.of("Asia/Jakarta");
 
     private static final Set<RoleName> ADMIN_ASSIGNABLE_ROLES = Set.of(
             RoleName.STAF_LAPANGAN,
@@ -71,27 +74,55 @@ public class UserService {
     // ──────────────────────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
-    public List<UserDto> getPendingAdminRegistrations() {
-        return userRepository.findByStatus_NameAndRole_RoleNameIn(
-                UserStatusName.PENDING,
-                ADMIN_ASSIGNABLE_ROLES)
-                .stream()
+    public List<UserDto> getAllAdminUsers() {
+        return userRepository.findByRole_RoleNameIn(ADMIN_ASSIGNABLE_ROLES).stream()
                 .map(this::toDto)
                 .toList();
     }
 
     @Transactional
     public UserDto approvePendingAdminRegistration(UUID id) {
-        User pendingUser = findPendingAdminUser(id);
+        // The user must be in PENDING or SUSPENDED state
+        User pendingUser = findPendingOrSuspendedAdminUser(id);
         pendingUser.setStatus(requireUserStatus(UserStatusName.AKTIF));
+        pendingUser.setBannedAt(null);
         User saved = userRepository.save(pendingUser);
         return toDto(saved);
     }
 
     @Transactional
-    public void rejectPendingAdminRegistration(UUID id) {
-        User pendingUser = findPendingAdminUser(id);
-        userRepository.delete(pendingUser);
+    public UserDto rejectPendingAdminRegistration(UUID id) {
+        // The user must be in PENDING or SUSPENDED state
+        User pendingUser = findPendingOrSuspendedAdminUser(id);
+        pendingUser.setStatus(requireUserStatus(UserStatusName.BANNED));
+        pendingUser.setBannedAt(LocalDateTime.now(ZONE_JAKARTA));
+        User saved = userRepository.save(pendingUser);
+        return toDto(saved);
+    }
+
+    @Transactional
+    public UserDto suspendUser(UUID id) {
+        // The user must be in AKTIF state
+        User user = findActiveAdminUser(id);
+        user.setStatus(requireUserStatus(UserStatusName.SUSPENDED));
+        User saved = userRepository.save(user);
+        return toDto(saved);
+    }
+
+    @Transactional
+    public int deleteExpiredBannedUsers() {
+        LocalDateTime threshold = LocalDateTime.now(ZONE_JAKARTA).minusDays(3);
+        List<User> expiredBannedUsers = userRepository.findByStatus_NameAndBannedAtLessThanEqual(
+                UserStatusName.BANNED,
+                threshold);
+
+        if (expiredBannedUsers.isEmpty()) {
+            return 0;
+        }
+
+        expiredBannedUsers.forEach(user -> refreshTokenService.deleteRefreshTokenByUsername(user.getUsername()));
+        userRepository.deleteAllInBatch(expiredBannedUsers);
+        return expiredBannedUsers.size();
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -121,7 +152,19 @@ public class UserService {
             throw new BadRequestException("Tidak ada pengguna yang terautentikasi");
         }
 
+        if (request.getUsername() == null || request.getEmail() == null) {
+            throw new BadRequestException("Username dan email tidak boleh kosong");
+        }
+
+        if (authentication == null || !(authentication.getPrincipal() instanceof UserDetailsImpl)) {
+            throw new BadRequestException("Tidak ada pengguna yang terautentikasi");
+        }
+
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+
+        if (userDetails == null) {
+            throw new BadRequestException("Tidak ada pengguna yang terautentikasi");
+        }
 
         if (userDetails == null) {
             throw new BadRequestException("Tidak ada pengguna yang terautentikasi");
@@ -155,6 +198,8 @@ public class UserService {
 
         // Rotate refresh token: revoke old username's token, create one for new
         // username
+        // Rotate refresh token: revoke old username's token, create one for new
+        // username
         refreshTokenService.deleteRefreshTokenByUsername(oldUsername);
         String newRefreshToken = refreshTokenService.createRefreshToken(updated.getUsername());
 
@@ -162,7 +207,6 @@ public class UserService {
         // principal
         UsernamePasswordAuthenticationToken newAuth = new UsernamePasswordAuthenticationToken(newUserDetails, null,
                 newUserDetails.getAuthorities());
-        SecurityContextHolder.getContext().setAuthentication(newAuth);
 
         return UpdateProfileResponse.builder()
                 .user(toDto(updated))
@@ -182,6 +226,7 @@ public class UserService {
                 .email(user.getEmail())
                 .role(user.getRole().getRoleName())
                 .status(user.getStatus() != null ? user.getStatus().getName().name() : null)
+                .status(user.getStatus() != null ? user.getStatus().getName().name() : null)
                 .membershipStart(user.getMembershipStart())
                 .membershipEnd(user.getMembershipEnd())
                 .build();
@@ -191,13 +236,20 @@ public class UserService {
     // Helpers
     // ──────────────────────────────────────────────────────────────────────────
 
-    private User findPendingAdminUser(UUID id) {
+    private User findPendingOrSuspendedAdminUser(UUID id) {
+        return userRepository.findByIdAndStatus_NameInAndRole_RoleNameIn(
+                id,
+                Set.of(UserStatusName.PENDING, UserStatusName.SUSPENDED),
+                ADMIN_ASSIGNABLE_ROLES)
+                .orElseThrow(() -> new ResourceNotFoundException("Pengguna tidak ditemukan: " + id));
+    }
+
+    private User findActiveAdminUser(UUID id) {
         return userRepository.findByIdAndStatus_NameAndRole_RoleNameIn(
                 id,
-                UserStatusName.PENDING,
+                UserStatusName.AKTIF,
                 ADMIN_ASSIGNABLE_ROLES)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Pengguna pending admin/staff tidak ditemukan: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Pengguna tidak ditemukan: " + id));
     }
 
     private UserStatus requireUserStatus(UserStatusName statusName) {
