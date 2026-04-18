@@ -63,6 +63,7 @@ public class DataSeeder implements ApplicationRunner {
     private final EntityManager entityManager;
 
     @Override
+    @Transactional
     public void run(ApplicationArguments args) {
         seedUserStatuses();
         seedRoles();
