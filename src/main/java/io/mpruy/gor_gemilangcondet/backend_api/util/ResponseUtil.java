@@ -4,6 +4,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.ContentDisposition;
 import org.springframework.stereotype.Component;
 
 import io.mpruy.gor_gemilangcondet.backend_api.dto.BaseResponseDto;
@@ -92,5 +93,15 @@ public class ResponseUtil {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         return new ResponseEntity<>(response, headers, status);
+    }
+
+    /**
+     * Build a raw file download response.
+     */
+    public static ResponseEntity<byte[]> download(byte[] content, String filename, MediaType mediaType) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(mediaType);
+        headers.setContentDisposition(ContentDisposition.attachment().filename(filename).build());
+        return new ResponseEntity<>(content, headers, HttpStatus.OK);
     }
 }

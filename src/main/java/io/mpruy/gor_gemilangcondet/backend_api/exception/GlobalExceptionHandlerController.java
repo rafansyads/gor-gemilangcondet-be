@@ -5,8 +5,8 @@ import java.util.stream.Collectors;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -92,6 +92,12 @@ public class GlobalExceptionHandlerController {
     public ResponseEntity<BaseResponseDto<Object>> handleExternalService(ExternalServiceException ex) {
         return ResponseUtil.error("Layanan eksternal tidak tersedia: " + ex.getMessage(),
                 HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
+    @ExceptionHandler(DownloadContentException.class)
+    public ResponseEntity<BaseResponseDto<Object>> handleDownloadContent(DownloadContentException ex) {
+        return ResponseUtil.error("Gagal menyiapkan file unduhan: " + ex.getMessage(),
+                HttpStatus.UNPROCESSABLE_CONTENT);
     }
 
     @ExceptionHandler(Exception.class)

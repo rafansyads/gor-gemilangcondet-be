@@ -6,9 +6,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import jakarta.persistence.EntityManager;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,16 +29,16 @@ import io.mpruy.gor_gemilangcondet.backend_api.entities.users.Role;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.RoleName;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.UserStatus;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.users.UserStatusName;
-import io.mpruy.gor_gemilangcondet.backend_api.repository.BarangRepository;
+import io.mpruy.gor_gemilangcondet.backend_api.repository.AlatOlahragaRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.BarangKantinRepository;
+import io.mpruy.gor_gemilangcondet.backend_api.repository.BarangRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.BarangTokoRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.LapanganRepository;
-import io.mpruy.gor_gemilangcondet.backend_api.repository.AlatOlahragaRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.RoleRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.UserStatusRepository;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.annotation.Order;
 
 /**
  * Ensures every {@link RoleName} value has a corresponding row in the
@@ -63,6 +63,7 @@ public class DataSeeder implements ApplicationRunner {
     private final EntityManager entityManager;
 
     @Override
+    @Transactional
     public void run(ApplicationArguments args) {
         seedUserStatuses();
         seedRoles();
@@ -73,7 +74,6 @@ public class DataSeeder implements ApplicationRunner {
         resetAllLapanganToTersedia();
     }
 
-    @Transactional
     private void migrateLegacySellableRowsToConcreteSubclasses() {
         // Convert legacy plain barang rows (pre-abstract migration) into concrete
         // child rows while preserving existing IDs and FK references.
@@ -263,7 +263,6 @@ public class DataSeeder implements ApplicationRunner {
      * table may be empty while 'barang' still holds orphaned rows.
      * Fix: delete orphaned barang rows first via native query, then re-seed.
      */
-    @Transactional
     public void seedAlatOlahraga() {
         // Clean up orphaned barang rows that were meant to be alat_olahraga
         // but lost their child row due to schema changes. Only deletes barang
@@ -310,7 +309,6 @@ public class DataSeeder implements ApplicationRunner {
      * Seeds sellable items into concrete subclasses (kantin & toko).
      * Idempotent by name to avoid duplicate seeds on repeated startup.
      */
-    @Transactional
     public void seedBarangJual() {
         Set<String> existingNames = new HashSet<>(
                 barangRepository.findAll().stream()

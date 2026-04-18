@@ -11,8 +11,6 @@ import io.mpruy.gor_gemilangcondet.backend_api.service.StockService;
 import io.mpruy.gor_gemilangcondet.backend_api.util.ResponseUtil;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ContentDisposition;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -59,25 +57,16 @@ public class StockController {
 
     @PreAuthorize("hasAnyAuthority('STAF_LAPANGAN', 'STAF_TOKO', 'OWNER', 'ADMIN')")
     @GetMapping("/export")
-    public ResponseEntity<BaseResponseDto<byte[]>> exportOverviewCsv() {
+    public ResponseEntity<byte[]> exportOverviewCsv() {
         byte[] csv = stockService.exportStockOverviewCsv();
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(new MediaType("text", "csv"));
-        headers.setContentDisposition(ContentDisposition.attachment().filename("stock-overview.csv").build());
-        return ResponseUtil.success(csv, "Data stok berhasil diekspor", HttpStatus.OK)
-                .toBuilder().headers(headers).build();
+        return ResponseUtil.download(csv, "stock-overview.csv", new MediaType("text", "csv"));
     }
 
     @PreAuthorize("hasAnyAuthority('STAF_LAPANGAN', 'STAF_TOKO', 'OWNER', 'ADMIN')")
     @GetMapping("/{barangId}/card/export")
-    public ResponseEntity<BaseResponseDto<byte[]>> exportStockCardCsv(@PathVariable UUID barangId) {
+    public ResponseEntity<byte[]> exportStockCardCsv(@PathVariable UUID barangId) {
         byte[] csv = stockService.exportStockCardCsv(barangId);
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(new MediaType("text", "csv"));
-        headers.setContentDisposition(
-                ContentDisposition.attachment().filename("stock-card-" + barangId + ".csv").build());
-        return ResponseUtil.success(csv, "Data stok berhasil diekspor", HttpStatus.OK)
-                .toBuilder().headers(headers).build();
+        return ResponseUtil.download(csv, "stock-card-" + barangId + ".csv", new MediaType("text", "csv"));
     }
 
     private UUID getAuthenticatedUserId() {

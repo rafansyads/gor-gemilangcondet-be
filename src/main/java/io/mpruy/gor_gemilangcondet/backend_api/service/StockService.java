@@ -19,6 +19,7 @@ import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.Barang;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.StockMutationDirection;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.StockMutationSource;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.BadRequestException;
+import io.mpruy.gor_gemilangcondet.backend_api.exception.DownloadContentException;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.ResourceNotFoundException;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.BarangRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.StockMutationRepository;
@@ -126,44 +127,64 @@ public class StockService {
 
     @Transactional(readOnly = true)
     public byte[] exportStockOverviewCsv() {
-        StockOverviewResponse overview = stockMutationService.getStockOverview();
-        StringBuilder csv = new StringBuilder();
-        csv.append("Kode,Nama,Kategori,Tipe,Harga,Stok,AmbangBatas,Status,NilaiStok\n");
+        try {
+            StockOverviewResponse overview = stockMutationService.getStockOverview();
+            StringBuilder csv = new StringBuilder();
+            csv.append("Kode,Nama,Kategori,Tipe,Harga,Stok,AmbangBatas,Status,NilaiStok\n");
 
-        for (StockItemResponse item : overview.getItems()) {
-            csv.append(stockMapper.escapeCsv(item.getKode())).append(',')
-                    .append(stockMapper.escapeCsv(item.getNama())).append(',')
-                    .append(stockMapper.escapeCsv(item.getKategori())).append(',')
-                    .append(stockMapper.escapeCsv(item.getItemType())).append(',')
-                    .append(item.getHarga()).append(',')
-                    .append(item.getStok()).append(',')
-                    .append(item.getAmbangBatas()).append(',')
-                    .append(stockMapper.escapeCsv(item.getStatus())).append(',')
-                    .append(item.getNilaiStok())
-                    .append('\n');
+            for (StockItemResponse item : overview.getItems()) {
+                csv.append(stockMapper.escapeCsv(item.getKode())).append(',')
+                        .append(stockMapper.escapeCsv(item.getNama())).append(',')
+                        .append(stockMapper.escapeCsv(item.getKategori())).append(',')
+                        .append(stockMapper.escapeCsv(item.getItemType())).append(',')
+                        .append(item.getHarga()).append(',')
+                        .append(item.getStok()).append(',')
+                        .append(item.getAmbangBatas()).append(',')
+                        .append(stockMapper.escapeCsv(item.getStatus())).append(',')
+                        .append(item.getNilaiStok())
+                        .append('\n');
+            }
+
+            byte[] content = csv.toString().getBytes(StandardCharsets.UTF_8);
+            if (content.length == 0) {
+                throw new DownloadContentException("Konten CSV stok kosong");
+            }
+            return content;
+        } catch (DownloadContentException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new DownloadContentException("Ekspor data stok gagal", ex);
         }
-
-        return csv.toString().getBytes(StandardCharsets.UTF_8);
     }
 
     @Transactional(readOnly = true)
     public byte[] exportStockCardCsv(UUID barangId) {
-        StockCardResponse card = stockMutationService.getStockCard(barangId);
-        StringBuilder csv = new StringBuilder();
-        csv.append("Waktu,Arah,Sumber,Jumlah,StokSebelum,StokSesudah,Alasan,StaffId\n");
+        try {
+            StockCardResponse card = stockMutationService.getStockCard(barangId);
+            StringBuilder csv = new StringBuilder();
+            csv.append("Waktu,Arah,Sumber,Jumlah,StokSebelum,StokSesudah,Alasan,StaffId\n");
 
-        for (StockCardEntryResponse entry : card.getEntries()) {
-            csv.append(entry.getWaktu()).append(',')
-                    .append(entry.getArah()).append(',')
-                    .append(entry.getSumber()).append(',')
-                    .append(entry.getJumlah()).append(',')
-                    .append(entry.getStokSebelum()).append(',')
-                    .append(entry.getStokSesudah()).append(',')
-                    .append(stockMapper.escapeCsv(entry.getAlasan())).append(',')
-                    .append(entry.getStaffId() == null ? "" : entry.getStaffId())
-                    .append('\n');
+            for (StockCardEntryResponse entry : card.getEntries()) {
+                csv.append(entry.getWaktu()).append(',')
+                        .append(entry.getArah()).append(',')
+                        .append(entry.getSumber()).append(',')
+                        .append(entry.getJumlah()).append(',')
+                        .append(entry.getStokSebelum()).append(',')
+                        .append(entry.getStokSesudah()).append(',')
+                        .append(stockMapper.escapeCsv(entry.getAlasan())).append(',')
+                        .append(entry.getStaffId() == null ? "" : entry.getStaffId())
+                        .append('\n');
+            }
+
+            byte[] content = csv.toString().getBytes(StandardCharsets.UTF_8);
+            if (content.length == 0) {
+                throw new DownloadContentException("Konten CSV kartu stok kosong");
+            }
+            return content;
+        } catch (DownloadContentException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new DownloadContentException("Ekspor kartu stok gagal", ex);
         }
-
-        return csv.toString().getBytes(StandardCharsets.UTF_8);
     }
 }
