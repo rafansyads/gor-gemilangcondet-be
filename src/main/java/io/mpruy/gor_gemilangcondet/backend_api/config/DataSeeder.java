@@ -15,6 +15,10 @@ import org.springframework.transaction.annotation.Transactional;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.Lapangan;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.LapanganStatus;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.LapanganType;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.pos.PosProduct;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.pos.PosProductCategory;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.AlatOlahraga;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.AlatOlahragaStatus;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.Barang;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.alat_olahraga.AlatOlahraga;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.alat_olahraga.AlatOlahragaStatus;
@@ -34,6 +38,7 @@ import io.mpruy.gor_gemilangcondet.backend_api.repository.BarangKantinRepository
 import io.mpruy.gor_gemilangcondet.backend_api.repository.BarangTokoRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.LapanganRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.AlatOlahragaRepository;
+import io.mpruy.gor_gemilangcondet.backend_api.repository.PosProductRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.RoleRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.UserStatusRepository;
 import lombok.RequiredArgsConstructor;
@@ -57,6 +62,7 @@ public class DataSeeder implements ApplicationRunner {
     private final UserStatusRepository userStatusRepository;
     private final LapanganRepository lapanganRepository;
     private final AlatOlahragaRepository alatOlahragaRepository;
+    private final PosProductRepository posProductRepository;
     private final BarangRepository barangRepository;
     private final BarangKantinRepository barangKantinRepository;
     private final BarangTokoRepository barangTokoRepository;
@@ -69,7 +75,7 @@ public class DataSeeder implements ApplicationRunner {
         seedRoles();
         seedLapangan(); // nantinya tergantung GOR
         seedAlatOlahraga(); // nantinya tergantung GOR, bisa jadi tidak ada alat olahraga yang disewakan
-        migrateLegacySellableRowsToConcreteSubclasses();
+        seedPosProducts();
         seedBarangJual(); // seed makanan & minuman untuk dijual di kasir
         resetAllLapanganToTersedia();
     }
@@ -304,6 +310,46 @@ public class DataSeeder implements ApplicationRunner {
 
         alatOlahragaRepository.saveAll(equipment);
         log.info("Seeded {} unit alat olahraga tipe RAKET", equipment.size());
+    }
+
+    /**
+     * Development-seeding untuk produk POS (kantin/toko).
+     * Idempotent: hanya mengisi data jika tabel masih kosong.
+     */
+    private void seedPosProducts() {
+        if (posProductRepository.count() > 0) {
+            return;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        List<PosProduct> products = List.of(
+            PosProduct.builder().name("Nasi Goreng").sku("KNT-MKN-001").price(15000).stock(50)
+                .category(PosProductCategory.MAKANAN).createdAt(now).updatedAt(now).build(),
+            PosProduct.builder().name("Mie Goreng").sku("KNT-MKN-002").price(14000).stock(40)
+                .category(PosProductCategory.MAKANAN).createdAt(now).updatedAt(now).build(),
+            PosProduct.builder().name("Sosis Bakar").sku("KNT-MKN-003").price(12000).stock(25)
+                .category(PosProductCategory.MAKANAN).createdAt(now).updatedAt(now).build(),
+            PosProduct.builder().name("Es Teh").sku("KNT-MNM-001").price(6000).stock(80)
+                .category(PosProductCategory.MINUMAN).createdAt(now).updatedAt(now).build(),
+            PosProduct.builder().name("Jus Jeruk").sku("KNT-MNM-002").price(10000).stock(35)
+                .category(PosProductCategory.MINUMAN).createdAt(now).updatedAt(now).build(),
+            PosProduct.builder().name("Air Mineral").sku("KNT-MNM-003").price(5000).stock(120)
+                .category(PosProductCategory.MINUMAN).createdAt(now).updatedAt(now).build(),
+            PosProduct.builder().name("Raket Pro 7U").sku("RTL-RKT-001").price(450000).stock(18)
+                .category(PosProductCategory.RAKET).createdAt(now).updatedAt(now).build(),
+            PosProduct.builder().name("Raket Training").sku("RTL-RKT-002").price(275000).stock(12)
+                .category(PosProductCategory.RAKET).createdAt(now).updatedAt(now).build(),
+            PosProduct.builder().name("Sepatu Court Lite").sku("RTL-SPT-001").price(520000).stock(10)
+                .category(PosProductCategory.SEPATU).createdAt(now).updatedAt(now).build(),
+            PosProduct.builder().name("Sepatu Court Grip").sku("RTL-SPT-002").price(610000).stock(8)
+                .category(PosProductCategory.SEPATU).createdAt(now).updatedAt(now).build(),
+            PosProduct.builder().name("Grip Raket").sku("RTL-AKS-001").price(22000).stock(90)
+                .category(PosProductCategory.AKSESORIS).createdAt(now).updatedAt(now).build(),
+            PosProduct.builder().name("Wristband").sku("RTL-AKS-002").price(30000).stock(27)
+                .category(PosProductCategory.AKSESORIS).createdAt(now).updatedAt(now).build());
+
+        posProductRepository.saveAll(products);
+        log.info("Seeded {} produk POS", products.size());
     }
 
     /**

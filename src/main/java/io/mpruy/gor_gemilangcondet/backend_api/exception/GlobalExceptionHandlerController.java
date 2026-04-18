@@ -5,8 +5,9 @@ import java.util.stream.Collectors;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authorization.AuthorizationDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -64,8 +65,8 @@ public class GlobalExceptionHandlerController {
         return ResponseUtil.error(ex.getMessage(), HttpStatus.FORBIDDEN);
     }
 
-    @ExceptionHandler(AuthorizationDeniedException.class)
-    public ResponseEntity<BaseResponseDto<Object>> handleAuthorizationDenied(AuthorizationDeniedException ex) {
+    @ExceptionHandler({ AccessDeniedException.class, AuthorizationDeniedException.class })
+    public ResponseEntity<BaseResponseDto<Object>> handleAccessDenied(RuntimeException ex) {
         return ResponseUtil.error("Akses ditolak", HttpStatus.FORBIDDEN);
     }
 
