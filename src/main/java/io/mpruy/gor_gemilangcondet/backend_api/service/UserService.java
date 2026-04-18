@@ -166,6 +166,10 @@ public class UserService {
             throw new BadRequestException("Tidak ada pengguna yang terautentikasi");
         }
 
+        if (userDetails == null) {
+            throw new BadRequestException("Tidak ada pengguna yang terautentikasi");
+        }
+
         User currentUser = userDetails.getUser();
         String oldUsername = currentUser.getUsername();
 

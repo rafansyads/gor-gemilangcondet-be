@@ -33,4 +33,8 @@ public abstract class Barang {
 
     @Column(nullable = false)
     private double price;
+
+    private String unit;
+
+    private String imageUrl;
 }

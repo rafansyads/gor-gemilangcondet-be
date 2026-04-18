@@ -71,6 +71,16 @@ public class CorsConfig {
 					.allowCredentials(true)
 					.maxAge(3600); // cache pre-flight for 1 hour
 			}
+
+			@Override
+			public void addResourceHandlers(org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry registry) {
+				registry.addResourceHandler("/products/**")
+						.addResourceLocations("file:uploads/products/");
+                registry.addResourceHandler("/courts/**")
+						.addResourceLocations("file:uploads/court-images/");
+				registry.addResourceHandler("/payments/proof/**")
+						.addResourceLocations("file:uploads/payment-proofs/");
+			}
 		};
 	}
 }
