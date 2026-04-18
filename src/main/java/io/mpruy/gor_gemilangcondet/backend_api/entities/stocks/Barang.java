@@ -15,7 +15,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @SuperBuilder
-public class Barang {
+public abstract class Barang {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -30,16 +30,6 @@ public class Barang {
 
     @Column(nullable = false)
     private long stock;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private BarangType type;
-
-    @Column(unique = true, nullable = false)
-    private String sku;
-
-    @Column(nullable = false)
-    private double purchasePrice;
 
     @Column(nullable = false)
     private double price;

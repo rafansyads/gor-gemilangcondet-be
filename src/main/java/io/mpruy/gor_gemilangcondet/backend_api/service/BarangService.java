@@ -3,9 +3,12 @@ package io.mpruy.gor_gemilangcondet.backend_api.service;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.stocks.BarangRequestDto;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.stocks.BarangResponseDto;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.Barang;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.toko.BarangToko;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.toko.BarangTokoStatus;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.toko.BarangTokoType;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.BarangRepository;
+import io.mpruy.gor_gemilangcondet.backend_api.repository.BarangTokoRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -25,19 +28,12 @@ import java.util.stream.Collectors;
 public class BarangService {
 
     private final BarangRepository barangRepository;
+    private final BarangTokoRepository barangTokoRepository;
 
-    @Value("${app.upload.dir:uploads/payment-proofs}")
-    private String baseUploadDir;
-    
-    // We will save in uploads/products
     private final String PRODUCT_UPLOAD_DIR = "uploads/products";
 
     @Transactional
     public BarangResponseDto createBarang(BarangRequestDto request, MultipartFile image) throws IOException {
-        if (request.getPrice() <= request.getPurchasePrice()) {
-            throw new IllegalArgumentException("Harga Jual harus lebih besar dari Harga Beli!");
-        }
-
         String imageUrl = null;
         if (image != null && !image.isEmpty()) {
             File uploadDir = new File(PRODUCT_UPLOAD_DIR);
@@ -51,20 +47,19 @@ public class BarangService {
             imageUrl = "/" + PRODUCT_UPLOAD_DIR + "/" + filename;
         }
 
-        Barang barang = Barang.builder()
+        BarangToko barang = BarangToko.builder()
                 .name(request.getName())
-                .sku(request.getSku())
-                .type(request.getType())
-                .purchasePrice(request.getPurchasePrice())
                 .price(request.getPrice())
                 .stock(request.getStock())
                 .unit(request.getUnit())
                 .imageUrl(imageUrl)
+                .type(BarangTokoType.LAINNYA)
+                .status(BarangTokoStatus.TERSEDIA)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
 
-        Barang saved = barangRepository.save(barang);
+        Barang saved = barangTokoRepository.save(barang);
         return mapToDto(saved);
     }
 
@@ -78,9 +73,6 @@ public class BarangService {
         return BarangResponseDto.builder()
                 .id(barang.getId())
                 .name(barang.getName())
-                .sku(barang.getSku())
-                .type(barang.getType())
-                .purchasePrice(barang.getPurchasePrice())
                 .price(barang.getPrice())
                 .stock(barang.getStock())
                 .unit(barang.getUnit())

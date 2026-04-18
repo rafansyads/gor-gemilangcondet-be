@@ -4,7 +4,6 @@ import io.mpruy.gor_gemilangcondet.backend_api.dto.BaseResponseDto;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.transaksi.requests.CheckoutRequest;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.transaksi.responses.TransaksiResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.Barang;
-import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.BarangType;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.BadRequestException;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.BarangRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.security.UserDetailsImpl;

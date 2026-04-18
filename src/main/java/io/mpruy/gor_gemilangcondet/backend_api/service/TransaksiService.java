@@ -5,6 +5,8 @@ import io.mpruy.gor_gemilangcondet.backend_api.dto.transaksi.requests.CheckoutRe
 import io.mpruy.gor_gemilangcondet.backend_api.dto.transaksi.responses.TransaksiDetailResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.transaksi.responses.TransaksiResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.Barang;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.StockMutationDirection;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.StockMutationSource;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.transaksi.Transaksi;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.transaksi.TransaksiDetail;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.transaksi.TransaksiStatus;
@@ -26,6 +28,8 @@ public class TransaksiService {
 
     private final TransaksiRepository transaksiRepository;
     private final BarangRepository barangRepository;
+    private final StockService stockService;
+    private final StockMutationService stockMutationService;
 
     @Transactional
     public TransaksiResponse checkout(CheckoutRequest request, UUID staffId) {
@@ -45,6 +49,8 @@ public class TransaksiService {
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "Barang tidak ditemukan: " + item.getBarangId()));
 
+            long beforeStock = barang.getStock();
+
             if (barang.getStock() < item.getKuantitas()) {
                 throw new BadRequestException(
                         "Stok " + barang.getName() + " tidak mencukupi. Tersedia: "
@@ -52,6 +58,17 @@ public class TransaksiService {
             }
 
             barang.setStock(barang.getStock() - item.getKuantitas());
+            barang.setUpdatedAt(LocalDateTime.now());
+
+            stockMutationService.recordMutation(
+                    barang,
+                    StockMutationDirection.OUT,
+                    item.getKuantitas(),
+                    StockMutationSource.POS,
+                    "Checkout transaksi",
+                    staffId,
+                    beforeStock,
+                    barang.getStock());
 
             double lineSubtotal = barang.getPrice() * item.getKuantitas();
             subtotal += lineSubtotal;
