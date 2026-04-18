@@ -40,7 +40,7 @@ public class ReservasiService {
 
     /** Payment deadline in minutes from reservation creation. */
     private static final int PAYMENT_DEADLINE_MINUTES = 10;
-
+    
     /** Reservation statuses considered inactive (slots freed). */
     private static final List<ReservasiStatus> INACTIVE_STATUSES = List.of(
             ReservasiStatus.DIBATALKAN,
@@ -172,16 +172,8 @@ public class ReservasiService {
                     .build());
         }
 
-        @Transactional(readOnly = true)
-        public LapanganResponse getCourtById(UUID id) {
-                Lapangan court = lapanganRepository.findById(id)
-                                .orElseThrow(() -> new ResourceNotFoundException("Lapangan tidak ditemukan: " + id));
-                return toLapanganResponse(court);
-        }
-
-        // ──────────────────────────────────────────────────────────────────────────
-        // Court Availability
-        // ──────────────────────────────────────────────────────────────────────────
+        return result;
+    }
 
     @Transactional(readOnly = true)
     public LapanganResponse getCourt(UUID id) {

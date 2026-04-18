@@ -24,7 +24,8 @@ public class PosProductService {
     @Transactional(readOnly = true)
     public List<PosProductResponse> getProducts(String query, PosProductCategory category) {
         String normalizedQuery = normalize(query);
-        return posProductRepository.search(normalizedQuery, category)
+        String categoryStr = category != null ? category.name() : null;
+        return posProductRepository.search(normalizedQuery, categoryStr)
                 .stream()
                 .map(this::toResponse)
                 .toList();
