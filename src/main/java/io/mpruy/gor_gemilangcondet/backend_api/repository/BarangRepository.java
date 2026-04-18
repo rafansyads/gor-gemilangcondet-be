@@ -1,7 +1,6 @@
 package io.mpruy.gor_gemilangcondet.backend_api.repository;
 
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.Barang;
-import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.BarangType;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -20,9 +19,6 @@ public interface BarangRepository extends JpaRepository<Barang, UUID> {
     @Query("SELECT b FROM Barang b WHERE b.id = :id")
     Optional<Barang> findByIdWithPessimisticLock(@Param("id") UUID id);
 
-    @Query("SELECT b FROM Barang b WHERE b.type NOT IN :excludedTypes ORDER BY b.name")
-    List<Barang> findByTypeNotIn(@Param("excludedTypes") List<BarangType> excludedTypes);
-
-    @Query("SELECT b FROM Barang b WHERE TYPE(b) = Barang ORDER BY b.name")
+    @Query("SELECT b FROM Barang b WHERE TYPE(b) <> AlatOlahraga ORDER BY b.name")
     List<Barang> findAllSellable();
 }
