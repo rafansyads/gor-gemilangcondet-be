@@ -40,20 +40,7 @@ public class ScheduleController {
     private final ScheduleService scheduleService;
     private final JwtRoleExtractor jwtRoleExtractor;
 
-    /**
-     * Ambil jadwal lapangan untuk tanggal tertentu.
-     *
-     * <p>
-     * Data diambil dari backend Fadhil. Role yang terdeteksi dari JWT
-     * menentukan apakah {@code namaWakil} akan disertakan di respons.
-     *
-     * @param authHeader header Authorization (opsional, format: Bearer
-     *                   &lt;token&gt;)
-     * @param date       tanggal yang diminta (format: {@code yyyy-MM-dd}), default
-     *                   hari ini
-     * @return {@link BaseResponseDto} berisi {@link ScheduleResponse} grid waktu ×
-     *         lapangan
-     */
+    
     @GetMapping
     public ResponseEntity<BaseResponseDto<ScheduleResponse>> getSchedule(
             @RequestHeader(value = "Authorization", required = false) String authHeader,

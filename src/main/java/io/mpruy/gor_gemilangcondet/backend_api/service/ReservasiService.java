@@ -172,8 +172,16 @@ public class ReservasiService {
                     .build());
         }
 
-        return result;
-    }
+        @Transactional(readOnly = true)
+        public LapanganResponse getCourtById(UUID id) {
+                Lapangan court = lapanganRepository.findById(id)
+                                .orElseThrow(() -> new ResourceNotFoundException("Lapangan tidak ditemukan: " + id));
+                return toLapanganResponse(court);
+        }
+
+        // ──────────────────────────────────────────────────────────────────────────
+        // Court Availability
+        // ──────────────────────────────────────────────────────────────────────────
 
     @Transactional(readOnly = true)
     public LapanganResponse getCourt(UUID id) {
