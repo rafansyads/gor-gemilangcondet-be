@@ -17,8 +17,6 @@ import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.LapanganSta
 import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.LapanganType;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.pos.PosProduct;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.pos.PosProductCategory;
-import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.AlatOlahraga;
-import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.AlatOlahragaStatus;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.Barang;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.alat_olahraga.AlatOlahraga;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.alat_olahraga.AlatOlahragaStatus;
@@ -76,6 +74,7 @@ public class DataSeeder implements ApplicationRunner {
         seedLapangan(); // nantinya tergantung GOR
         seedAlatOlahraga(); // nantinya tergantung GOR, bisa jadi tidak ada alat olahraga yang disewakan
         seedPosProducts();
+        migrateLegacySellableRowsToConcreteSubclasses(); // migrate legacy barang rows to concrete subclasses
         seedBarangJual(); // seed makanan & minuman untuk dijual di kasir
         resetAllLapanganToTersedia();
     }

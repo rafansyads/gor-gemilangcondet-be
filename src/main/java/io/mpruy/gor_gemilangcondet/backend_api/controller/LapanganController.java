@@ -46,14 +46,6 @@ public class LapanganController {
                 .toBuilder().build();
     }
 
-    // GET /courts/{id}
-    @GetMapping("/{id}")
-    public ResponseEntity<BaseResponseDto<LapanganResponse>> getCourtById(@PathVariable UUID id) {
-        LapanganResponse court = reservasiService.getCourtById(id);
-        return ResponseUtil.success(court, "Detail lapangan berhasil diambil", HttpStatus.OK)
-                .toBuilder().build();
-    }
-
     // POST /courts
     @PreAuthorize("hasAnyAuthority('ADMIN', 'STAF_LAPANGAN')")
     @PostMapping

@@ -44,7 +44,7 @@ public class BarangService {
             String filename = UUID.randomUUID() + "_" + image.getOriginalFilename();
             Path filePath = Paths.get(PRODUCT_UPLOAD_DIR, filename);
             Files.copy(image.getInputStream(), filePath);
-            imageUrl = "/" + PRODUCT_UPLOAD_DIR + "/" + filename;
+            imageUrl = filename;
         }
 
         BarangToko barang = BarangToko.builder()
@@ -67,6 +67,47 @@ public class BarangService {
         return barangRepository.findAll().stream()
                 .map(this::mapToDto)
                 .collect(Collectors.toList());
+    }
+
+    public List<Barang> getAllSellable() {
+        return barangRepository.findAllSellable();
+    }
+
+    public Barang getBarangById(UUID id) {
+        return barangRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Barang dengan ID " + id + " tidak ditemukan"));
+    }
+
+    @Transactional
+    public Barang updateBarang(UUID id, BarangRequestDto request, MultipartFile image) throws IOException {
+        Barang barang = barangRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Barang dengan ID " + id + " tidak ditemukan"));
+
+        barang.setName(request.getName());
+        barang.setPrice(request.getPrice());
+        barang.setStock(request.getStock());
+        barang.setUnit(request.getUnit());
+
+        if (image != null && !image.isEmpty()) {
+            File uploadDir = new File(PRODUCT_UPLOAD_DIR);
+            if (!uploadDir.exists()) {
+                uploadDir.mkdirs();
+            }
+            String filename = UUID.randomUUID() + "_" + image.getOriginalFilename();
+            Path filePath = Paths.get(PRODUCT_UPLOAD_DIR, filename);
+            Files.copy(image.getInputStream(), filePath);
+            barang.setImageUrl(filename);
+        }
+
+        barang.setUpdatedAt(LocalDateTime.now());
+        return barangRepository.save(barang);
+    }
+
+    @Transactional
+    public void deleteBarang(UUID id) {
+        Barang barang = barangRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Barang dengan ID " + id + " tidak ditemukan"));
+        barangRepository.delete(barang);
     }
 
     private BarangResponseDto mapToDto(Barang barang) {

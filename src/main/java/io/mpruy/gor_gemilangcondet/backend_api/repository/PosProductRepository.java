@@ -15,14 +15,14 @@ public interface PosProductRepository extends JpaRepository<PosProduct, UUID> {
 
     boolean existsBySkuIgnoreCase(String sku);
 
-    @Query("""
-            select p from PosProduct p
-            where (:category is null or p.category = :category)
-              and (:query is null or trim(:query) = ''
-                   or lower(p.name) like lower(concat('%', :query, '%'))
-                   or lower(p.sku) like lower(concat('%', :query, '%')))
+    @Query(value = """
+            select * from pos_products p
+            where (cast(:category as varchar) is null or p.category = :category)
+              and (cast(:query as varchar) is null
+                   or lower(p.name) like lower('%' || cast(:query as varchar) || '%')
+                   or lower(p.sku) like lower('%' || cast(:query as varchar) || '%'))
             order by p.name asc
-            """)
+            """, nativeQuery = true)
     List<PosProduct> search(@Param("query") String query,
-                            @Param("category") PosProductCategory category);
+                            @Param("category") String category);
 }
