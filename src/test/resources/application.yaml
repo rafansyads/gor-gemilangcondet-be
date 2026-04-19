@@ -42,30 +42,13 @@ app:
     expiration: 86400000
   upload:
     dir: build/test-uploads/payment-proofs
-
-bucket4j:
-  enabled: true
-  filters:
-    - cache-name: rate-limit-buckets
-      filter-method: servlet
-      filter-order: 1
-      http-response-body: '{"status": 429, "message": "Terlalu banyak permintaan.", "timestamp": null, "data": null}'
-      rate-limits:
-        - execute-condition: "request.getRequestURI().startsWith('/api/auth')"
-          cache-key: "getRemoteAddr()"
-          bandwidths:
-            - capacity: 5
-              time: 1
-              unit: minutes
-        - execute-condition: "request.getMethod().matches('POST|PUT|DELETE') && !request.getRequestURI().startsWith('/api/auth')"
-          cache-key: "getRemoteAddr()"
-          bandwidths:
-            - capacity: 20
-              time: 1
-              unit: minutes
-        - execute-condition: "request.getMethod().equals('GET') && !request.getRequestURI().startsWith('/api/auth')"
-          cache-key: "getRemoteAddr()"
-          bandwidths:
-            - capacity: 100
-              time: 1
-              unit: minutes
+  rate-limit:
+    auth:
+      capacity: 10
+      window-seconds: 300
+    cud:
+      capacity: 20
+      window-seconds: 60
+    read:
+      capacity: 125
+      window-seconds: 60
