@@ -8,8 +8,8 @@ import io.mpruy.gor_gemilangcondet.backend_api.dto.message.ScheduleUpdateMessage
 import io.mpruy.gor_gemilangcondet.backend_api.dto.response.ScheduleResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.response.ScheduleSlotResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.response.ScheduleTimeRowResponse;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.bookings.Booking;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.Lapangan;
-import io.mpruy.gor_gemilangcondet.backend_api.entity.Booking;
 import io.mpruy.gor_gemilangcondet.backend_api.enums.BookingStatus;
 import io.mpruy.gor_gemilangcondet.backend_api.event.BookingStatusChangedEvent;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.ExternalServiceException;

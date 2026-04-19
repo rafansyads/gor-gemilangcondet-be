@@ -1,27 +1,27 @@
 package io.mpruy.gor_gemilangcondet.backend_api.service;
 
 import io.mpruy.gor_gemilangcondet.backend_api.dto.stocks.requests.StockAdjustmentRequest;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.stocks.responses.StockCardEntryResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.stocks.responses.StockCardResponse;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.stocks.responses.StockItemResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.stocks.responses.StockOverviewResponse;
-import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.StockMutation;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.stocks.responses.StockSummaryResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.StockMutationDirection;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.StockMutationSource;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.kantin.BarangKantin;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.kantin.BarangKantinStatus;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.kantin.BarangKantinType;
-import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.toko.BarangToko;
-import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.toko.BarangTokoStatus;
-import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.toko.BarangTokoType;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.BadRequestException;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.BarangRepository;
-import io.mpruy.gor_gemilangcondet.backend_api.repository.StockMutationRepository;
+import io.mpruy.gor_gemilangcondet.backend_api.service.mapper.StockMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -30,7 +30,6 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -42,44 +41,66 @@ class StockServiceTest {
     private BarangRepository barangRepository;
 
     @Mock
-    private StockMutationRepository stockMutationRepository;
+    private StockMutationService stockMutationService;
+
+    @Spy
+    private StockMapper stockMapper;
 
     @InjectMocks
     private StockService stockService;
 
     @Test
-    void getStockOverview_ShouldComputeSummaryAndLowStock() {
+    void getStockOverview_ShouldDelegateToMutationService() {
+        StockOverviewResponse expected = StockOverviewResponse.builder()
+                .summary(StockSummaryResponse.builder().totalProduk(1).stokRendah(0).nilaiStok(15000).build())
+                .items(List.of())
+                .build();
+
+        when(stockMutationService.getStockOverview()).thenReturn(expected);
+
+        StockOverviewResponse result = stockService.getStockOverview();
+
+        assertEquals(expected, result);
+        verify(stockMutationService).getStockOverview();
+    }
+
+    @Test
+    void adjustStock_ShouldIncreaseStockAndRecordMutation() {
+        UUID barangId = UUID.randomUUID();
+        UUID staffId = UUID.randomUUID();
         BarangKantin kantin = BarangKantin.builder()
-                .id(UUID.randomUUID())
+                .id(barangId)
                 .name("Nasi Goreng")
                 .type(BarangKantinType.MAKANAN_BERAT)
                 .status(BarangKantinStatus.TERSEDIA)
-                .reorderThreshold(10)
+                .reorderThreshold(3)
                 .stock(5)
                 .price(15000)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
 
-        BarangToko toko = BarangToko.builder()
-                .id(UUID.randomUUID())
-                .name("Raket Yonex")
-                .type(BarangTokoType.ALAT_OLAHRAGA)
-                .status(BarangTokoStatus.TERSEDIA)
-                .stock(8)
-                .price(450000)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
+        StockAdjustmentRequest request = new StockAdjustmentRequest();
+        request.setBarangId(barangId);
+        request.setDirection(StockMutationDirection.IN);
+        request.setQuantity(2);
+        request.setReason("Restock");
 
-        when(barangRepository.findAllSellable()).thenReturn(List.of(kantin, toko));
+        when(barangRepository.findByIdWithPessimisticLock(barangId)).thenReturn(Optional.of(kantin));
 
-        StockOverviewResponse response = stockService.getStockOverview();
+        StockItemResponse result = stockService.adjustStock(request, staffId);
 
-        assertEquals(2, response.getSummary().getTotalProduk());
-        assertEquals(1, response.getSummary().getStokRendah());
-        assertEquals(5 * 15000 + 8 * 450000, response.getSummary().getNilaiStok());
-        assertTrue(response.getItems().stream().anyMatch(i -> "RENDAH".equals(i.getStatus())));
+        assertEquals(7, kantin.getStock());
+        assertEquals(7, result.getStok());
+        verify(stockMutationService).recordMutation(
+                kantin,
+                StockMutationDirection.IN,
+                2,
+                StockMutationSource.MANUAL,
+                "Restock",
+                staffId,
+                5,
+                7);
     }
 
     @Test
@@ -106,7 +127,15 @@ class StockServiceTest {
         when(barangRepository.findByIdWithPessimisticLock(barangId)).thenReturn(Optional.of(kantin));
 
         assertThrows(BadRequestException.class, () -> stockService.adjustStock(request, UUID.randomUUID()));
-        verify(stockMutationRepository, never()).save(any(StockMutation.class));
+        verify(stockMutationService, never()).recordMutation(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyLong());
     }
 
     @Test
@@ -133,58 +162,127 @@ class StockServiceTest {
 
         when(barangRepository.findByIdWithPessimisticLock(barangId)).thenReturn(Optional.of(kantin));
 
-        stockService.adjustStock(request, staffId);
+        StockItemResponse result = stockService.adjustStock(request, staffId);
 
         assertEquals(0, kantin.getStock());
         assertEquals(BarangKantinStatus.TERJUAL, kantin.getStatus());
-
-        ArgumentCaptor<StockMutation> mutationCaptor = ArgumentCaptor.forClass(StockMutation.class);
-        verify(stockMutationRepository).save(mutationCaptor.capture());
-        StockMutation mutation = mutationCaptor.getValue();
-
-        assertEquals(StockMutationDirection.OUT, mutation.getDirection());
-        assertEquals(StockMutationSource.MANUAL, mutation.getSource());
-        assertEquals(5, mutation.getQuantity());
-        assertEquals(5, mutation.getBeforeStock());
-        assertEquals(0, mutation.getAfterStock());
-        assertEquals(staffId, mutation.getActorStaffId());
+        assertEquals("RENDAH", result.getStatus());
+        verify(stockMutationService).recordMutation(
+                kantin,
+                StockMutationDirection.OUT,
+                5,
+                StockMutationSource.MANUAL,
+                "Barang rusak",
+                staffId,
+                5,
+                0);
     }
 
     @Test
-    void getStockCard_ShouldReturnMappedEntries() {
+    void getStockCard_ShouldDelegateToMutationService() {
         UUID barangId = UUID.randomUUID();
-        BarangToko toko = BarangToko.builder()
-                .id(barangId)
-                .name("Raket Yonex")
-                .type(BarangTokoType.ALAT_OLAHRAGA)
-                .status(BarangTokoStatus.TERSEDIA)
-                .stock(8)
-                .price(450000)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
+        StockCardResponse expected = StockCardResponse.builder()
+                .barangId(barangId)
+                .namaBarang("Nasi Goreng")
+                .entries(List.of())
                 .build();
 
-        StockMutation mutation = StockMutation.builder()
-                .id(UUID.randomUUID())
-                .barang(toko)
-                .direction(StockMutationDirection.OUT)
-                .quantity(1)
-                .beforeStock(9)
-                .afterStock(8)
-                .source(StockMutationSource.POS)
-                .reason("Checkout transaksi")
-                .actorStaffId(UUID.randomUUID())
-                .createdAt(LocalDateTime.now())
+        when(stockMutationService.getStockCard(barangId)).thenReturn(expected);
+
+        StockCardResponse result = stockService.getStockCard(barangId);
+
+        assertEquals(expected, result);
+        verify(stockMutationService).getStockCard(barangId);
+    }
+
+    @Test
+    void exportStockOverviewCsv_ShouldGenerateCsvRows() {
+        StockItemResponse item = StockItemResponse.builder()
+                .barangId(UUID.randomUUID())
+                .kode("KNT-12345678")
+                .nama("Nasi Goreng")
+                .kategori("BARANG_KANTIN")
+                .itemType("MAKANAN_BERAT")
+                .harga(15000)
+                .stok(5)
+                .ambangBatas(3)
+                .status("NORMAL")
+                .nilaiStok(75000)
                 .build();
 
-        when(barangRepository.findById(barangId)).thenReturn(Optional.of(toko));
-        when(stockMutationRepository.findByBarangIdOrderByCreatedAtDesc(barangId)).thenReturn(List.of(mutation));
+        when(stockMutationService.getStockOverview()).thenReturn(
+                StockOverviewResponse.builder()
+                        .summary(StockSummaryResponse.builder().totalProduk(1).stokRendah(0).nilaiStok(75000).build())
+                        .items(List.of(item))
+                        .build());
 
-        StockCardResponse response = stockService.getStockCard(barangId);
+        byte[] bytes = stockService.exportStockOverviewCsv();
+        String csv = new String(bytes, StandardCharsets.UTF_8);
 
-        assertEquals(barangId, response.getBarangId());
-        assertEquals("Raket Yonex", response.getNamaBarang());
-        assertEquals(1, response.getEntries().size());
-        assertEquals(StockMutationDirection.OUT, response.getEntries().getFirst().getArah());
+        assertTrue(csv.contains("Kode,Nama,Kategori,Tipe,Harga,Stok,AmbangBatas,Status,NilaiStok"));
+        assertTrue(csv.contains("\"Nasi Goreng\""));
+        assertTrue(csv.contains("75000.0"));
+    }
+
+    @Test
+    void exportStockCardCsv_ShouldGenerateCsvRows() {
+        UUID barangId = UUID.randomUUID();
+        UUID staffId = UUID.randomUUID();
+        LocalDateTime now = LocalDateTime.now();
+
+        StockCardEntryResponse entry = StockCardEntryResponse.builder()
+                .waktu(now)
+                .arah(StockMutationDirection.OUT)
+                .sumber(StockMutationSource.MANUAL)
+                .jumlah(2)
+                .stokSebelum(5)
+                .stokSesudah(3)
+                .alasan("Barang rusak")
+                .staffId(staffId)
+                .build();
+
+        when(stockMutationService.getStockCard(barangId)).thenReturn(
+                StockCardResponse.builder()
+                        .barangId(barangId)
+                        .namaBarang("Nasi Goreng")
+                        .entries(List.of(entry))
+                        .build());
+
+        byte[] bytes = stockService.exportStockCardCsv(barangId);
+        String csv = new String(bytes, StandardCharsets.UTF_8);
+
+        assertTrue(csv.contains("Waktu,Arah,Sumber,Jumlah,StokSebelum,StokSesudah,Alasan,StaffId"));
+        assertTrue(csv.contains("Barang rusak"));
+        assertTrue(csv.contains(staffId.toString()));
+    }
+
+    @Test
+    void exportStockCardCsv_ShouldReturnEmptyStaffIdWhenNull() {
+        UUID barangId = UUID.randomUUID();
+        LocalDateTime now = LocalDateTime.now();
+
+        StockCardEntryResponse entry = StockCardEntryResponse.builder()
+                .waktu(now)
+                .arah(StockMutationDirection.IN)
+                .sumber(StockMutationSource.MANUAL)
+                .jumlah(2)
+                .stokSebelum(1)
+                .stokSesudah(3)
+                .alasan("Restock")
+                .staffId(null)
+                .build();
+
+        when(stockMutationService.getStockCard(barangId)).thenReturn(
+                StockCardResponse.builder()
+                        .barangId(barangId)
+                        .namaBarang("Nasi Goreng")
+                        .entries(List.of(entry))
+                        .build());
+
+        byte[] bytes = stockService.exportStockCardCsv(barangId);
+        String csv = new String(bytes, StandardCharsets.UTF_8);
+
+        assertTrue(csv.contains("Restock"));
+        assertTrue(csv.contains(",\n"));
     }
 }

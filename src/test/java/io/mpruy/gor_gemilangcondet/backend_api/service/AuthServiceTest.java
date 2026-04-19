@@ -120,6 +120,37 @@ class AuthServiceTest {
     class LoginTests {
 
         @Test
+        @DisplayName("Should reject login when persisted failed login attempts are still blocked")
+        void login_UserFailedAttemptsBlocked_ThrowsTooManyRequest() {
+            LoginRequest request = new LoginRequest();
+            request.setUsernameOrEmail("testuser");
+            request.setPassword("Password1");
+
+            testUser.setFailedLoginAttempts(5);
+            testUser.setFailedLoginWindowStartedAt(LocalDateTime.now().minusSeconds(10));
+            when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
+
+            assertThrows(TooManyRequestException.class, () -> authService.login(request, null));
+            verify(authenticationManager, never()).authenticate(any());
+        }
+
+        @Test
+        @DisplayName("Should persist failed login attempt to user when authentication fails")
+        void login_UserBadCredentials_ShouldPersistFailedAttempt() {
+            LoginRequest request = new LoginRequest();
+            request.setUsernameOrEmail("testuser");
+            request.setPassword("wrong");
+
+            when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
+            when(authenticationManager.authenticate(any()))
+                    .thenThrow(new BadCredentialsException("Bad credentials"));
+
+            assertThrows(BadCredentialsException.class, () -> authService.login(request, null));
+            verify(userRepository, atLeastOnce()).save(argThat(u -> u.getFailedLoginAttempts() >= 1));
+            verify(loginAttemptService, never()).recordFailedAttempt("testuser");
+        }
+
+        @Test
         @DisplayName("Should login successfully with valid credentials")
         void login_Success() {
             LoginRequest request = new LoginRequest();
@@ -655,11 +686,13 @@ class AuthServiceTest {
         void logout_Success() {
             String token = "valid-jwt-token";
             when(jwtUtils.extractUsername(token)).thenReturn("testuser");
+            when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
 
             authService.logout("Bearer " + token);
 
             verify(jwtTokenBlacklist).blacklistToken(token);
             verify(refreshTokenService).deleteRefreshTokenByUsername("testuser");
+            verify(userRepository).save(argThat(user -> user.getLastLogoutAt() != null));
         }
 
         @Test
@@ -706,6 +739,8 @@ class AuthServiceTest {
             LoginRequest request = new LoginRequest();
             request.setUsernameOrEmail("testuser");
             request.setPassword("wrong");
+
+            when(userRepository.findByUsername("testuser")).thenReturn(Optional.empty());
 
             when(authenticationManager.authenticate(any()))
                     .thenThrow(new BadCredentialsException("Bad credentials"));
@@ -755,6 +790,43 @@ class AuthServiceTest {
 
             assertNotNull(result);
             verify(loginAttemptService).resetAttempts("test@example.com");
+        }
+    }
+
+    @Nested
+    @DisplayName("Deactivate Account Tests")
+    class DeactivateAccountTests {
+
+        @Test
+        @DisplayName("Should deactivate account and revoke tokens for valid bearer token")
+        void deactivateAccount_Success() {
+            String token = "valid-token";
+            String authHeader = "Bearer " + token;
+
+            when(jwtTokenBlacklist.isTokenBlacklisted(token)).thenReturn(false);
+            when(jwtUtils.extractUsername(token)).thenReturn("testuser");
+            when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(testUser));
+
+            org.springframework.security.core.userdetails.UserDetails springUserDetails = new org.springframework.security.core.userdetails.User(
+                    "testuser", "pass", List.of(new SimpleGrantedAuthority("GUEST")));
+
+            when(userDetailsService.loadUserByUsername("testuser")).thenReturn(springUserDetails);
+            when(jwtUtils.validateToken(token, springUserDetails)).thenReturn(true);
+            when(userStatusRepository.findByName(UserStatusName.NON_AKTIF)).thenReturn(Optional.of(nonActiveStatus));
+
+            authService.deactivateAccount(authHeader);
+
+            verify(userRepository, atLeastOnce())
+                    .save(argThat(user -> user.getStatus() != null
+                            && UserStatusName.NON_AKTIF.equals(user.getStatus().getName())));
+            verify(jwtTokenBlacklist).blacklistToken(token);
+            verify(refreshTokenService).deleteRefreshTokenByUsername("testuser");
+        }
+
+        @Test
+        @DisplayName("Should reject deactivate account when authorization header is invalid")
+        void deactivateAccount_InvalidHeader() {
+            assertThrows(BadRequestException.class, () -> authService.deactivateAccount("invalid-header"));
         }
     }
 

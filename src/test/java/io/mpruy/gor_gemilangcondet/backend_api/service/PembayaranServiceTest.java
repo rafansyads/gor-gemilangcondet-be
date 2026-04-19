@@ -361,7 +361,6 @@ class PembayaranServiceTest {
                 return p;
             });
             when(reservasiRepository.save(any(Reservasi.class))).thenAnswer(i -> i.getArgument(0));
-            when(lapanganRepository.save(any(Lapangan.class))).thenAnswer(i -> i.getArgument(0));
 
             ConfirmPaymentResponse result = pembayaranService.confirmPayment(reservasiId);
 

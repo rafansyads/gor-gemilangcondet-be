@@ -124,7 +124,7 @@ class UserControllerTest {
     }
 
     @Test
-    @DisplayName("GET /users/pending-admin-registrations → 200 OK")
+    @DisplayName("GET /users/admin-users → 200 OK")
     void getPendingAdminRegistrations_Success() throws Exception {
         UserDto pending = UserDto.builder()
                 .id(UUID.randomUUID())
@@ -134,9 +134,9 @@ class UserControllerTest {
                 .status("PENDING")
                 .build();
 
-        when(userService.getAllAdminByAdminAssignableStatus()).thenReturn(List.of(pending));
+        when(userService.getAllAdminUsers()).thenReturn(List.of(pending));
 
-        mockMvc.perform(get("/users/pending-admin-registrations"))
+        mockMvc.perform(get("/users/admin-users"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].status").value("PENDING"));
     }

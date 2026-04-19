@@ -67,15 +67,11 @@ class UserServiceTest {
     private Role guestRole;
     private UserStatus activeStatus;
     private UserStatus pendingStatus;
-    private UserStatus activeStatus;
-    private UserStatus pendingStatus;
 
     @BeforeEach
     void setUp() {
         userId = UUID.randomUUID();
         guestRole = Role.builder().id(1).roleName(RoleName.GUEST).build();
-        activeStatus = UserStatus.builder().id(1).name(UserStatusName.AKTIF).build();
-        pendingStatus = UserStatus.builder().id(2).name(UserStatusName.PENDING).build();
         activeStatus = UserStatus.builder().id(1).name(UserStatusName.AKTIF).build();
         pendingStatus = UserStatus.builder().id(2).name(UserStatusName.PENDING).build();
         testUser = User.builder()
@@ -162,7 +158,7 @@ class UserServiceTest {
                     .status(pendingStatus)
                     .build();
 
-            when(userRepository.findByStatus_NameInAndRole_RoleNameIn(anyCollection(), anyCollection()))
+            when(userRepository.findByRole_RoleNameIn(anyCollection()))
                     .thenReturn(List.of(pendingStaff));
 
             List<UserDto> result = userService.getAllAdminByAdminAssignableStatus();
@@ -170,10 +166,7 @@ class UserServiceTest {
             assertEquals(1, result.size());
             assertEquals("staf_pending", result.get(0).getUsername());
             assertEquals(UserStatusName.PENDING.name(), result.get(0).getStatus());
-            verify(userRepository).findByStatus_NameInAndRole_RoleNameIn(
-                    eq(Set.of(UserStatusName.PENDING, UserStatusName.SUSPENDED, UserStatusName.BANNED,
-                            UserStatusName.AKTIF)),
-                    anyCollection());
+            verify(userRepository).findByRole_RoleNameIn(anyCollection());
         }
 
         @Test

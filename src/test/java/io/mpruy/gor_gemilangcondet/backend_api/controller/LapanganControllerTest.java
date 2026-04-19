@@ -87,6 +87,7 @@ class LapanganControllerTest {
     void createCourt_Success() throws Exception {
         CreateLapanganRequest createReq = new CreateLapanganRequest();
         createReq.setName("Badminton 4");
+        createReq.setKode("BDM-004");
         createReq.setType(LapanganType.BADMINTON);
         createReq.setTarifPerJam(100000);
         BaseRequestDto<CreateLapanganRequest> request = new BaseRequestDto<>();

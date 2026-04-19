@@ -1,11 +1,15 @@
 package io.mpruy.gor_gemilangcondet.backend_api.service.mapper;
 
+import java.util.List;
 import java.util.Locale;
 
 import org.springframework.stereotype.Service;
 
+import io.mpruy.gor_gemilangcondet.backend_api.dto.stocks.responses.StockCardEntryResponse;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.stocks.responses.StockCardResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.stocks.responses.StockItemResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.Barang;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.StockMutation;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.alat_olahraga.AlatOlahraga;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.kantin.BarangKantin;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.kantin.BarangKantinStatus;
@@ -20,7 +24,6 @@ public class StockMapper {
 
     public StockItemResponse toItemResponse(Barang barang) {
         long threshold = resolveThreshold(barang);
-        String status = barang.getStock() <= threshold ? "RENDAH" : "NORMAL";
 
         return StockItemResponse.builder()
                 .barangId(barang.getId())
@@ -31,12 +34,43 @@ public class StockMapper {
                 .harga(barang.getPrice())
                 .stok(barang.getStock())
                 .ambangBatas(threshold)
-                .status(status)
-                .nilaiStok(barang.getStock() * barang.getPrice())
+                .status(resolveStockStatus(barang))
+                .nilaiStok(calculateStockValue(barang))
                 .build();
     }
 
-    private long resolveThreshold(Barang barang) {
+    public StockCardEntryResponse toCardEntryResponse(StockMutation mutation) {
+        return StockCardEntryResponse.builder()
+                .waktu(mutation.getCreatedAt())
+                .arah(mutation.getDirection())
+                .sumber(mutation.getSource())
+                .jumlah(mutation.getQuantity())
+                .stokSebelum(mutation.getBeforeStock())
+                .stokSesudah(mutation.getAfterStock())
+                .alasan(mutation.getReason())
+                .staffId(mutation.getActorStaffId())
+                .build();
+    }
+
+    public StockCardResponse toCardResponse(Barang barang, List<StockCardEntryResponse> entries) {
+        return StockCardResponse.builder()
+                .barangId(barang.getId())
+                .kode(generateCode(barang))
+                .namaBarang(barang.getName())
+                .kategori(resolveCategory(barang))
+                .itemType(resolveItemType(barang))
+                .harga(barang.getPrice())
+                .stok(barang.getStock())
+                .ambangBatas(resolveThreshold(barang))
+                .status(resolveStockStatus(barang))
+                .nilaiStok(calculateStockValue(barang))
+                .unit(barang.getUnit())
+                .imageUrl(barang.getImageUrl())
+                .entries(entries)
+                .build();
+    }
+
+    public long resolveThreshold(Barang barang) {
         if (barang instanceof AlatOlahraga) {
             return ALAT_OLAHRAGA_THRESHOLD;
         }
@@ -52,7 +86,7 @@ public class StockMapper {
         return 0L;
     }
 
-    private String resolveCategory(Barang barang) {
+    public String resolveCategory(Barang barang) {
         if (barang instanceof AlatOlahraga) {
             return "ALAT_OLAHRAGA";
         }
@@ -68,7 +102,7 @@ public class StockMapper {
         return "UNKNOWN";
     }
 
-    private String resolveItemType(Barang barang) {
+    public String resolveItemType(Barang barang) {
         if (barang instanceof AlatOlahraga alat) {
             return alat.getType().name();
         }
@@ -82,6 +116,14 @@ public class StockMapper {
         }
 
         return "-";
+    }
+
+    public String resolveStockStatus(Barang barang) {
+        return barang.getStock() <= resolveThreshold(barang) ? "RENDAH" : "NORMAL";
+    }
+
+    public double calculateStockValue(Barang barang) {
+        return barang.getStock() * barang.getPrice();
     }
 
     public void applySellableStatus(Barang barang) {

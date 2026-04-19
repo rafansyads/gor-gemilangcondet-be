@@ -1,4 +1,4 @@
-package io.mpruy.gor_gemilangcondet.backend_api.entity;
+package io.mpruy.gor_gemilangcondet.backend_api.entities.bookings;
 
 import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.Lapangan;
 import io.mpruy.gor_gemilangcondet.backend_api.enums.BookingStatus;

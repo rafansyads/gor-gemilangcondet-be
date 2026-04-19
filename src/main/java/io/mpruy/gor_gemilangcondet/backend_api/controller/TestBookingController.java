@@ -1,7 +1,7 @@
 package io.mpruy.gor_gemilangcondet.backend_api.controller;
 
 import io.mpruy.gor_gemilangcondet.backend_api.dto.BaseResponseDto;
-import io.mpruy.gor_gemilangcondet.backend_api.entity.Booking;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.bookings.Booking;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.ConflictException;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.ResourceNotFoundException;
 import io.mpruy.gor_gemilangcondet.backend_api.service.ScheduleService;

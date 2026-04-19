@@ -2,8 +2,6 @@ package io.mpruy.gor_gemilangcondet.backend_api.service;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
-import java.util.Comparator;
-import java.util.List;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -14,7 +12,6 @@ import io.mpruy.gor_gemilangcondet.backend_api.dto.stocks.responses.StockCardEnt
 import io.mpruy.gor_gemilangcondet.backend_api.dto.stocks.responses.StockCardResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.stocks.responses.StockItemResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.stocks.responses.StockOverviewResponse;
-import io.mpruy.gor_gemilangcondet.backend_api.dto.stocks.responses.StockSummaryResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.Barang;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.StockMutationDirection;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.StockMutationSource;
@@ -22,7 +19,6 @@ import io.mpruy.gor_gemilangcondet.backend_api.exception.BadRequestException;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.DownloadContentException;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.ResourceNotFoundException;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.BarangRepository;
-import io.mpruy.gor_gemilangcondet.backend_api.repository.StockMutationRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.service.mapper.StockMapper;
 import lombok.RequiredArgsConstructor;
 
@@ -30,34 +26,13 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class StockService {
 
-    private static final long ALAT_OLAHRAGA_THRESHOLD = 1L;
-    private static final long TOKO_GLOBAL_THRESHOLD = 5L;
-
     private final BarangRepository barangRepository;
-    private final StockMutationRepository stockMutationRepository;
     private final StockMutationService stockMutationService;
     private final StockMapper stockMapper;
 
     @Transactional(readOnly = true)
     public StockOverviewResponse getStockOverview() {
-        List<StockItemResponse> items = barangRepository.findAllSellable().stream()
-                .sorted(Comparator.comparing(Barang::getName))
-                .map(stockMapper::toItemResponse)
-                .toList();
-
-        long lowStock = items.stream().filter(i -> "RENDAH".equals(i.getStatus())).count();
-        double totalValue = items.stream().mapToDouble(StockItemResponse::getNilaiStok).sum();
-
-        StockSummaryResponse summary = StockSummaryResponse.builder()
-                .totalProduk(items.size())
-                .stokRendah(lowStock)
-                .nilaiStok(totalValue)
-                .build();
-
-        return StockOverviewResponse.builder()
-                .summary(summary)
-                .items(items)
-                .build();
+        return stockMutationService.getStockOverview();
     }
 
     @Transactional
@@ -101,28 +76,7 @@ public class StockService {
 
     @Transactional(readOnly = true)
     public StockCardResponse getStockCard(UUID barangId) {
-        Barang barang = barangRepository.findById(barangId)
-                .orElseThrow(() -> new ResourceNotFoundException("Barang tidak ditemukan: " + barangId));
-
-        List<StockCardEntryResponse> entries = stockMutationRepository.findByBarangIdOrderByCreatedAtDesc(barangId)
-                .stream()
-                .map(m -> StockCardEntryResponse.builder()
-                        .waktu(m.getCreatedAt())
-                        .arah(m.getDirection())
-                        .sumber(m.getSource())
-                        .jumlah(m.getQuantity())
-                        .stokSebelum(m.getBeforeStock())
-                        .stokSesudah(m.getAfterStock())
-                        .alasan(m.getReason())
-                        .staffId(m.getActorStaffId())
-                        .build())
-                .toList();
-
-        return StockCardResponse.builder()
-                .barangId(barang.getId())
-                .namaBarang(barang.getName())
-                .entries(entries)
-                .build();
+        return stockMutationService.getStockCard(barangId);
     }
 
     @Transactional(readOnly = true)

@@ -1,8 +1,9 @@
 package io.mpruy.gor_gemilangcondet.backend_api.event;
 
-import io.mpruy.gor_gemilangcondet.backend_api.entity.Booking;
 import lombok.Getter;
 import org.springframework.context.ApplicationEvent;
+
+import io.mpruy.gor_gemilangcondet.backend_api.entities.bookings.Booking;
 
 /**
  * Event yang diterbitkan oleh {@link io.mpruy.gor_gemilangcondet.backend_api.service.ScheduleService}

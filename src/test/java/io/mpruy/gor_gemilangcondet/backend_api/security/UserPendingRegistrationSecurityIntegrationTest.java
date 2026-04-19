@@ -71,7 +71,7 @@ class UserPendingRegistrationSecurityIntegrationTest {
     @Test
     @DisplayName("Pending list should return 401 for unauthenticated users")
     void pendingList_Unauthenticated_Returns401() throws Exception {
-        mockMvc.perform(get("/users/pending-admin-registrations"))
+        mockMvc.perform(get("/users/admin-users"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -79,7 +79,7 @@ class UserPendingRegistrationSecurityIntegrationTest {
     @WithMockUser(authorities = "MEMBER")
     @DisplayName("Pending list should return 403 for non-admin users")
     void pendingList_NonAdmin_Returns403() throws Exception {
-        mockMvc.perform(get("/users/pending-admin-registrations"))
+        mockMvc.perform(get("/users/admin-users"))
                 .andExpect(status().isForbidden());
     }
 
@@ -95,9 +95,9 @@ class UserPendingRegistrationSecurityIntegrationTest {
                 .status("PENDING")
                 .build();
 
-        when(userService.getAllAdminByAdminAssignableStatus()).thenReturn(List.of(pending));
+        when(userService.getAllAdminUsers()).thenReturn(List.of(pending));
 
-        mockMvc.perform(get("/users/pending-admin-registrations"))
+        mockMvc.perform(get("/users/admin-users"))
                 .andExpect(status().isOk());
     }
 

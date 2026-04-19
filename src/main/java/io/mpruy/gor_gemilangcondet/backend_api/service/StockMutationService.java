@@ -86,22 +86,9 @@ public class StockMutationService {
 
         List<StockCardEntryResponse> entries = stockMutationRepository.findByBarangIdOrderByCreatedAtDesc(barangId)
                 .stream()
-                .map(m -> StockCardEntryResponse.builder()
-                        .waktu(m.getCreatedAt())
-                        .arah(m.getDirection())
-                        .sumber(m.getSource())
-                        .jumlah(m.getQuantity())
-                        .stokSebelum(m.getBeforeStock())
-                        .stokSesudah(m.getAfterStock())
-                        .alasan(m.getReason())
-                        .staffId(m.getActorStaffId())
-                        .build())
+                .map(stockMapper::toCardEntryResponse)
                 .toList();
 
-        return StockCardResponse.builder()
-                .barangId(barang.getId())
-                .namaBarang(barang.getName())
-                .entries(entries)
-                .build();
+        return stockMapper.toCardResponse(barang, entries);
     }
 }

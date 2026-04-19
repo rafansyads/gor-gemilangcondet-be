@@ -13,6 +13,7 @@ import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.alat_olahraga.Ala
 import io.mpruy.gor_gemilangcondet.backend_api.exception.BadRequestException;
 import io.mpruy.gor_gemilangcondet.backend_api.exception.ResourceNotFoundException;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.AlatOlahragaRepository;
+import io.mpruy.gor_gemilangcondet.backend_api.repository.LapanganLogRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.LapanganRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.ReservasiRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,6 +42,8 @@ class ReservasiServiceTest {
     private ReservasiRepository reservasiRepository;
     @Mock
     private AlatOlahragaRepository alatOlahragaRepository;
+    @Mock
+    private LapanganLogRepository lapanganLogRepository;
 
     @InjectMocks
     private ReservasiService reservasiService;
@@ -118,6 +121,7 @@ class ReservasiServiceTest {
         void createCourt_Success() {
             CreateLapanganRequest request = new CreateLapanganRequest();
             request.setName("Badminton 4");
+            request.setKode("BDM-004");
             request.setType(LapanganType.BADMINTON);
             request.setTarifPerJam(100000);
 
@@ -145,6 +149,7 @@ class ReservasiServiceTest {
 
             when(lapanganRepository.findById(courtId)).thenReturn(Optional.of(testCourt));
             when(lapanganRepository.save(any(Lapangan.class))).thenAnswer(i -> i.getArgument(0));
+            when(lapanganLogRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
             LapanganResponse result = reservasiService.updateCourt(courtId, request);
 
@@ -152,6 +157,7 @@ class ReservasiServiceTest {
             assertEquals(LapanganType.BADMINTON, result.getType());
         }
 
+        @Test
         void deleteCourt_Success() {
             when(lapanganRepository.findById(courtId)).thenReturn(Optional.of(testCourt));
             when(reservasiRepository.findOverlappingReservations(eq(courtId), any(), any(), any()))
@@ -421,8 +427,6 @@ class ReservasiServiceTest {
             when(reservasiRepository.findActiveReservationsDuringPeriod(any(), any(), any()))
                     .thenReturn(Collections.emptyList());
             when(alatOlahragaRepository.findById(equipId)).thenReturn(Optional.of(equipment));
-            when(alatOlahragaRepository.findByTypeInAndStatus(anyList(), eq(AlatOlahragaStatus.TERSEDIA)))
-                    .thenReturn(List.of(equipment));
 
             assertThrows(BadRequestException.class,
                     () -> reservasiService.createReservation(request));

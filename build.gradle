@@ -103,13 +103,6 @@ jacocoTestReport {
 		classDirectories.setFrom(files(classDirectories.files.collect {
 			fileTree(dir: it, excludes: [
 				'**/BackendApiApplication*',
-				'**/config/**',
-				'**/dto/**',
-				'**/entity/**',
-				'**/enums/**',
-				'**/event/**',
-				'**/client/**',
-				'**/security/**',
 			])
 		}))
 	}

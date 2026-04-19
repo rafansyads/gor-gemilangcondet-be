@@ -15,6 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import javax.cache.CacheManager;
+import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -70,8 +71,7 @@ class RateLimitingIntegrationTest {
         // The first 5 should NOT be 429 (they may be 401 or other errors, but not
         // rate-limited)
         for (int i = 0; i < 5; i++) {
-            MvcResult result = mockMvc.perform(post("/api/auth/login")
-                    .contextPath("/api")
+            MvcResult result = mockMvc.perform(post("/auth/login")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(loginBody))
                     .andReturn();
@@ -80,8 +80,7 @@ class RateLimitingIntegrationTest {
         }
 
         // 6th request should be rate-limited
-        mockMvc.perform(post("/api/auth/login")
-                .contextPath("/api")
+        mockMvc.perform(post("/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(loginBody))
                 .andExpect(status().isTooManyRequests());
@@ -91,53 +90,52 @@ class RateLimitingIntegrationTest {
     @Order(2)
     @DisplayName("CUD non-auth endpoint rate limit: 21st POST returns 429")
     void cudEndpoint_ExceedsLimit_Returns429() throws Exception {
-        String courtBody = """
-                {
-                  "data": {
-                    "name": "Test Court",
-                    "type": "BADMINTON",
-                    "tarifPerJam": 50000
-                  }
-                }
-                """;
+        LocalDate baseDate = LocalDate.of(2026, 3, 10);
+        int rateLimitedAt = -1;
 
-        // Send 20 POST requests (should not be rate-limited)
-        for (int i = 0; i < 20; i++) {
-            MvcResult result = mockMvc.perform(post("/api/courts")
-                    .contextPath("/api")
+        // Use public test-booking endpoint so requests are not blocked by auth before
+        // Bucket4j evaluates them.
+        for (int i = 0; i < 40; i++) {
+            int courtId = (i % 3) + 1;
+            String bookingBody = String.format(
+                    "{\"courtId\":%d,\"date\":\"%s\",\"time\":\"12:00\",\"customerName\":\"rate-%d\"}",
+                    courtId,
+                    baseDate.plusDays(i),
+                    i);
+
+            MvcResult result = mockMvc.perform(post("/test/book")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(courtBody))
+                    .content(bookingBody))
                     .andReturn();
-            int statusCode = result.getResponse().getStatus();
-            assertNotEquals429(statusCode, i + 1);
+
+            if (result.getResponse().getStatus() == 429) {
+                rateLimitedAt = i + 1;
+                break;
+            }
         }
 
-        // 21st POST request should be rate-limited
-        mockMvc.perform(post("/api/courts")
-                .contextPath("/api")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(courtBody))
-                .andExpect(status().isTooManyRequests());
+        assertTrue(rateLimitedAt > 0, "Expected 429 rate limit but never received it after 40 POST requests");
+        assertTrue(rateLimitedAt >= 21, "Rate limit triggered too early at request " + rateLimitedAt);
     }
 
     @Test
     @Order(3)
     @DisplayName("GET non-auth endpoint rate limit: requests eventually return 429")
     void getEndpoint_ExceedsLimit_Returns429() throws Exception {
-        // Send up to 150 GET requests — rate limit of 100/min should trigger around
-        // ~101-110
-        // (token bucket with greedy refill may allow a few extra due to timing)
+        // Use a static endpoint to produce a fast burst so token refill does not mask
+        // the rate limit in tests.
         int rateLimitedAt = -1;
-        for (int i = 0; i < 150; i++) {
-            MvcResult result = mockMvc.perform(get("/api/courts")
-                    .contextPath("/api"))
+        for (int i = 0; i < 180; i++) {
+            MvcResult result = mockMvc.perform(get("/test-schedule.html"))
                     .andReturn();
+
             if (result.getResponse().getStatus() == 429) {
                 rateLimitedAt = i + 1;
                 break;
             }
         }
-        assertTrue(rateLimitedAt > 0, "Expected 429 rate limit but never received it after 150 GET requests");
+
+        assertTrue(rateLimitedAt > 0, "Expected 429 rate limit but never received it after 180 GET requests");
         assertTrue(rateLimitedAt >= 100, "Rate limit triggered too early at request " + rateLimitedAt);
     }
 

@@ -1,6 +1,6 @@
 package io.mpruy.gor_gemilangcondet.backend_api.repository;
 
-import io.mpruy.gor_gemilangcondet.backend_api.entity.Booking;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.bookings.Booking;
 import io.mpruy.gor_gemilangcondet.backend_api.enums.BookingStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;

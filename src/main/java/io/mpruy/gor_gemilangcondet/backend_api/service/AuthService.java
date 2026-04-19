@@ -1,6 +1,8 @@
 package io.mpruy.gor_gemilangcondet.backend_api.service;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Optional;
 import java.util.Set;
 
 import org.springframework.security.authentication.AuthenticationManager;
@@ -44,6 +46,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class AuthService {
 
+    private static final ZoneId ZONE_JAKARTA = ZoneId.of("Asia/Jakarta");
+
     private final AuthenticationManager authenticationManager;
     private final JwtUtils jwtUtils;
     private final JwtTokenBlacklist jwtTokenBlacklist;
@@ -85,10 +89,28 @@ public class AuthService {
      * @param redirectUrl optional frontend URL to echo back in the response
      * @return {@link AuthResponse} carrying both tokens and the redirect URL
      */
+    @Transactional
     public AuthResponse login(LoginRequest request, String redirectUrl) {
         String credential = request.getUsernameOrEmail();
+        LocalDateTime now = LocalDateTime.now(ZONE_JAKARTA);
+        Optional<User> trackedUserOpt = findUserByCredential(credential);
 
-        if (loginAttemptService.isLocked(credential)) {
+        trackedUserOpt.ifPresent(user -> {
+            if (user.resetFailedLoginAttemptsIfWindowExpired(now)) {
+                userRepository.save(user);
+            }
+        });
+
+        if (trackedUserOpt.isPresent()) {
+            User trackedUser = trackedUserOpt.get();
+            if (trackedUser.isLoginBlocked(now)) {
+                LocalDateTime blockedUntil = trackedUser.getLoginBlockedUntil();
+                throw new TooManyRequestException(
+                        "Terlalu banyak percobaan login yang gagal. Silakan coba lagi pada " + blockedUntil);
+            }
+        }
+
+        if (trackedUserOpt.isEmpty() && loginAttemptService.isLocked(credential)) {
             LocalDateTime lockoutUntil = loginAttemptService.getLockoutUntil(credential);
             throw new TooManyRequestException(
                     "Terlalu banyak percobaan login yang gagal. Silakan coba lagi pada " + lockoutUntil);
@@ -101,13 +123,27 @@ public class AuthService {
             authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(credential, request.getPassword()));
         } catch (AuthenticationException ex) {
-            loginAttemptService.recordFailedAttempt(credential);
+            if (trackedUserOpt.isPresent()) {
+                User trackedUser = trackedUserOpt.get();
+                trackedUser.registerFailedLoginAttempt(now);
+                userRepository.save(trackedUser);
+            } else {
+                loginAttemptService.recordFailedAttempt(credential);
+            }
             throw ex;
         }
 
         loginAttemptService.resetAttempts(credential);
         SecurityContextHolder.getContext().setAuthentication(authentication);
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+
+        User trackedUser = trackedUserOpt
+                .or(() -> userRepository.findById(userDetails.getId()))
+                .orElse(null);
+        if (trackedUser != null) {
+            trackedUser.recordSuccessfulLogin(now);
+            userRepository.save(trackedUser);
+        }
 
         if (!ACTIVE_STATUS.name().equals(userDetails.getStatus())) {
             throw new ForbiddenException("Akun belum aktif atau dibatasi. Silakan hubungi admin.");
@@ -209,11 +245,18 @@ public class AuthService {
      * @param authorizationHeader raw {@code Authorization} header value ("Bearer
      *                            &lt;token&gt;")
      */
+    @Transactional
     public void logout(String authorizationHeader) {
         if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
             String token = authorizationHeader.substring(7);
             jwtTokenBlacklist.blacklistToken(token);
             String username = jwtUtils.extractUsername(token);
+
+            userRepository.findByUsername(username).ifPresent(user -> {
+                user.recordLogout(LocalDateTime.now(ZONE_JAKARTA));
+                userRepository.save(user);
+            });
+
             refreshTokenService.deleteRefreshTokenByUsername(username);
         }
         SecurityContextHolder.clearContext();
@@ -349,6 +392,48 @@ public class AuthService {
                         throw new ForbiddenException("Akun belum aktif atau dibatasi. Silakan hubungi admin.");
                     }
                 });
+    }
+
+    /**
+     * Finds a user by username or email. Used for login tracking (failed attempts,
+     * last login/logout timestamps) even when the credential is invalid for
+     * authentication purposes. This allows us to implement features like account
+     * ockout after too many failed attempts, even if the attacker is trying
+
+     *     * random usernames/emails.
+     *     * random usernames/emails.
+     *     * random usernames/emails.
+     *     * random usernames/emails.
+     *     * random usernames/emails.
+     *     * random usernames/emails.
+     *     * random usernames/emails.
+     *     * random usernames/emails.
+     *     * random usernames/emails.
+     *     * random usernames/emails.
+     *     * random usernames/emails.
+     *     * random usernames/emails.
+     *     * random usernames/emails.
+     *     * random usernames/emails.
+     *     * random usernames/emails.
+     *     * random usernames/emails.
+     *     * random usernames/emails.
+     *     * random usernames/emails.
+     *     * random usernames/emails.
+     *     * random usernames/emails.
+     *     * random usernames/emails.
+     *     * random usernames/emails.
+     *     * random usernames/emails.
+     *     * random usernames/emails.
+     *     * random usernames/emails.
+     *     * random usernames/emails.
+     *     * random usernames/emails.
+     *     * random usernames/emails.
+     *     * random usernames/emails.
+     *     * random usernames/emails.
+     */
+    private Optional<User> findUserByCredential(String credential) {
+        return userRepository.findByUsername(credential)
+                .or(() -> userRepository.findByEmail(credential));
     }
 
     /**

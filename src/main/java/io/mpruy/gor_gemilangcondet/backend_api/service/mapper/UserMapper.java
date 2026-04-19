@@ -17,6 +17,14 @@ public class UserMapper {
                 .status(user.getStatus() != null ? user.getStatus().getName().name() : null)
                 .membershipStart(user.getMembershipStart())
                 .membershipEnd(user.getMembershipEnd())
+                .lastLoginAt(user.getLastLoginAt())
+                .lastLogoutAt(user.getLastLogoutAt())
+                .failedLoginAttempts(user.getFailedLoginAttempts())
+                .failedLoginWindowStartedAt(user.getFailedLoginWindowStartedAt())
+                .createdAt(user.getCreatedAt())
+                .updatedAt(user.getUpdatedAt())
+                .statusChangedAt(user.getStatusChangedAt())
+                .bannedAt(user.getBannedAt())
                 .build();
     }
 

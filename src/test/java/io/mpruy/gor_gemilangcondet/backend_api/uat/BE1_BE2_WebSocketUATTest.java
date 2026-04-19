@@ -276,7 +276,7 @@ class BE1_BE2_WebSocketUATTest {
         connBad.await(5, TimeUnit.SECONDS);
         badClient.stop();
 
-        postBooking(4, "16:00", "Eko");
+        postBooking(3, "16:00", "Eko");
 
         assertThat(recvGood.await(3, TimeUnit.SECONDS)).isTrue()
                 .withFailMessage("Klien aktif tidak menerima broadcast meski klien lain sudah disconnect");

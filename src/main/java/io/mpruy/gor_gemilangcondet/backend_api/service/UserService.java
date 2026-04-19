@@ -80,6 +80,11 @@ public class UserService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<UserDto> getAllAdminByAdminAssignableStatus() {
+        return getAllAdminUsers();
+    }
+
     @Transactional
     public UserDto approvePendingAdminRegistration(UUID id) {
         // The user must be in PENDING or SUSPENDED state
@@ -152,23 +157,7 @@ public class UserService {
             throw new BadRequestException("Tidak ada pengguna yang terautentikasi");
         }
 
-        if (request.getUsername() == null || request.getEmail() == null) {
-            throw new BadRequestException("Username dan email tidak boleh kosong");
-        }
-
-        if (authentication == null || !(authentication.getPrincipal() instanceof UserDetailsImpl)) {
-            throw new BadRequestException("Tidak ada pengguna yang terautentikasi");
-        }
-
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-
-        if (userDetails == null) {
-            throw new BadRequestException("Tidak ada pengguna yang terautentikasi");
-        }
-
-        if (userDetails == null) {
-            throw new BadRequestException("Tidak ada pengguna yang terautentikasi");
-        }
 
         User currentUser = userDetails.getUser();
         String oldUsername = currentUser.getUsername();
@@ -207,6 +196,7 @@ public class UserService {
         // principal
         UsernamePasswordAuthenticationToken newAuth = new UsernamePasswordAuthenticationToken(newUserDetails, null,
                 newUserDetails.getAuthorities());
+        SecurityContextHolder.getContext().setAuthentication(newAuth);
 
         return UpdateProfileResponse.builder()
                 .user(toDto(updated))
@@ -226,9 +216,16 @@ public class UserService {
                 .email(user.getEmail())
                 .role(user.getRole().getRoleName())
                 .status(user.getStatus() != null ? user.getStatus().getName().name() : null)
-                .status(user.getStatus() != null ? user.getStatus().getName().name() : null)
                 .membershipStart(user.getMembershipStart())
                 .membershipEnd(user.getMembershipEnd())
+                .lastLoginAt(user.getLastLoginAt())
+                .lastLogoutAt(user.getLastLogoutAt())
+                .failedLoginAttempts(user.getFailedLoginAttempts())
+                .failedLoginWindowStartedAt(user.getFailedLoginWindowStartedAt())
+                .createdAt(user.getCreatedAt())
+                .updatedAt(user.getUpdatedAt())
+                .statusChangedAt(user.getStatusChangedAt())
+                .bannedAt(user.getBannedAt())
                 .build();
     }
 

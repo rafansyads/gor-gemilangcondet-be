@@ -18,4 +18,12 @@ public class UserDto {
     private String status;
     private LocalDateTime membershipStart;
     private LocalDateTime membershipEnd;
+    private LocalDateTime lastLoginAt;
+    private LocalDateTime lastLogoutAt;
+    private int failedLoginAttempts;
+    private LocalDateTime failedLoginWindowStartedAt;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private LocalDateTime statusChangedAt;
+    private LocalDateTime bannedAt;
 }
