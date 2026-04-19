@@ -40,6 +40,9 @@ import io.mpruy.gor_gemilangcondet.backend_api.security.service.JwtTokenBlacklis
 import io.mpruy.gor_gemilangcondet.backend_api.security.service.RefreshTokenService;
 import io.mpruy.gor_gemilangcondet.backend_api.service.mapper.AuthMapper;
 import io.mpruy.gor_gemilangcondet.backend_api.service.mapper.UserMapper;
+
+import java.time.Duration;
+
 import lombok.RequiredArgsConstructor;
 
 @Service
@@ -106,14 +109,16 @@ public class AuthService {
             if (trackedUser.isLoginBlocked(now)) {
                 LocalDateTime blockedUntil = trackedUser.getLoginBlockedUntil();
                 throw new TooManyRequestException(
-                        "Terlalu banyak percobaan login yang gagal. Silakan coba lagi pada " + blockedUntil);
+                        "Terlalu banyak percobaan login yang gagal. Silakan coba lagi dalam "
+                                + parseUserLockedUntil(blockedUntil));
             }
         }
 
         if (trackedUserOpt.isEmpty() && loginAttemptService.isLocked(credential)) {
             LocalDateTime lockoutUntil = loginAttemptService.getLockoutUntil(credential);
             throw new TooManyRequestException(
-                    "Terlalu banyak percobaan login yang gagal. Silakan coba lagi pada " + lockoutUntil);
+                    "Terlalu banyak percobaan login yang gagal. Silakan coba lagi dalam "
+                            + parseUserLockedUntil(lockoutUntil));
         }
 
         assertLoginStatusAllowed(credential);
@@ -398,38 +403,7 @@ public class AuthService {
      * Finds a user by username or email. Used for login tracking (failed attempts,
      * last login/logout timestamps) even when the credential is invalid for
      * authentication purposes. This allows us to implement features like account
-     * ockout after too many failed attempts, even if the attacker is trying
-
-     *     * random usernames/emails.
-     *     * random usernames/emails.
-     *     * random usernames/emails.
-     *     * random usernames/emails.
-     *     * random usernames/emails.
-     *     * random usernames/emails.
-     *     * random usernames/emails.
-     *     * random usernames/emails.
-     *     * random usernames/emails.
-     *     * random usernames/emails.
-     *     * random usernames/emails.
-     *     * random usernames/emails.
-     *     * random usernames/emails.
-     *     * random usernames/emails.
-     *     * random usernames/emails.
-     *     * random usernames/emails.
-     *     * random usernames/emails.
-     *     * random usernames/emails.
-     *     * random usernames/emails.
-     *     * random usernames/emails.
-     *     * random usernames/emails.
-     *     * random usernames/emails.
-     *     * random usernames/emails.
-     *     * random usernames/emails.
-     *     * random usernames/emails.
-     *     * random usernames/emails.
-     *     * random usernames/emails.
-     *     * random usernames/emails.
-     *     * random usernames/emails.
-     *     * random usernames/emails.
+     * lockout after too many failed attempts, even if the attacker is trying
      */
     private Optional<User> findUserByCredential(String credential) {
         return userRepository.findByUsername(credential)
@@ -507,6 +481,39 @@ public class AuthService {
             return parsed;
         } catch (IllegalArgumentException e) {
             throw new BadRequestException("Role " + rawRole + " tidak valid.");
+        }
+    }
+
+    /**
+     * 
+     */
+    private String parseUserLockedUntil(LocalDateTime lockedUntil) {
+        if (lockedUntil == null) {
+            return "waktu tidak diketahui";
+        }
+        if (lockedUntil.isBefore(LocalDateTime.now(ZONE_JAKARTA))) {
+            return "baru saja";
+        }
+        Duration durationToReset = Duration.between(LocalDateTime.now(ZONE_JAKARTA), lockedUntil);
+        if (durationToReset.isNegative() || durationToReset.isZero()) {
+            return "beberapa detik lagi";
+        }
+
+        if (durationToReset.toMinutes() < 1) {
+            long seconds = durationToReset.getSeconds();
+            return seconds + " detik";
+        } else if (durationToReset.toHours() < 1) {
+            long minutes = durationToReset.toMinutes();
+            return minutes + " menit" +
+                    (durationToReset.getSeconds() % 60 > 0 ? " dan beberapa detik" : "");
+        } else if (durationToReset.toDays() < 1) {
+            long hours = durationToReset.toHours();
+            return hours + " jam" +
+                    (durationToReset.toMinutes() % 60 > 0 ? " dan beberapa menit" : "");
+        } else {
+            long days = durationToReset.toDays();
+            return days + " hari" +
+                    (durationToReset.toHours() % 24 > 0 ? " dan beberapa jam" : "");
         }
     }
 }
