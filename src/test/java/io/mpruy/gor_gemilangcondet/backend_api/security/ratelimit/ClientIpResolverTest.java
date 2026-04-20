@@ -39,4 +39,54 @@ class ClientIpResolverTest {
 
         assertEquals("192.0.2.10", resolver.resolveClientIpv4(request));
     }
+
+    @Test
+    @DisplayName("Should resolve quoted ipv4 from Forwarded header")
+    void resolveQuotedForwardedFor() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("Forwarded", "for=\"203.0.113.9\";proto=https");
+        request.setRemoteAddr("127.0.0.1");
+
+        assertEquals("203.0.113.9", resolver.resolveClientIpv4(request));
+    }
+
+    @Test
+    @DisplayName("Should normalize IPv4 with port from X-Forwarded-For")
+    void normalizeIpv4WithPort() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("X-Forwarded-For", "198.51.100.7:443");
+        request.setRemoteAddr("127.0.0.1");
+
+        assertEquals("198.51.100.7", resolver.resolveClientIpv4(request));
+    }
+
+    @Test
+    @DisplayName("Should normalize IPv4-mapped IPv6")
+    void normalizeIpv4MappedIpv6() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("X-Forwarded-For", "::ffff:203.0.113.120");
+        request.setRemoteAddr("127.0.0.1");
+
+        assertEquals("203.0.113.120", resolver.resolveClientIpv4(request));
+    }
+
+    @Test
+    @DisplayName("Should map localhost IPv6 to 127.0.0.1")
+    void normalizeIpv6Localhost() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRemoteAddr("::1");
+
+        assertEquals("127.0.0.1", resolver.resolveClientIpv4(request));
+    }
+
+    @Test
+    @DisplayName("Should fallback to 127.0.0.1 when no valid IPv4 source")
+    void fallbackToDefaultLocalhost() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("X-Forwarded-For", "unknown, also-unknown");
+        request.addHeader("Forwarded", "for=\"[2001:db8::1]\"");
+        request.setRemoteAddr("not-an-ip");
+
+        assertEquals("127.0.0.1", resolver.resolveClientIpv4(request));
+    }
 }

@@ -30,6 +30,18 @@ class RateLimitRequestClassifierTest {
     }
 
     @Test
+    @DisplayName("Should classify POST PUT and DELETE as CUD")
+    void classifyOtherCudMethods() {
+        MockHttpServletRequest post = new MockHttpServletRequest("POST", "/orders");
+        MockHttpServletRequest put = new MockHttpServletRequest("PUT", "/orders/1");
+        MockHttpServletRequest delete = new MockHttpServletRequest("DELETE", "/orders/1");
+
+        assertEquals(RateLimitRule.CUD, classifier.classify(post));
+        assertEquals(RateLimitRule.CUD, classifier.classify(put));
+        assertEquals(RateLimitRule.CUD, classifier.classify(delete));
+    }
+
+    @Test
     @DisplayName("Should classify GET non-auth request as READ")
     void classifyGetAsRead() {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/products");
@@ -45,5 +57,32 @@ class RateLimitRequestClassifierTest {
         request.setContextPath("/api");
 
         assertNull(classifier.classify(request));
+    }
+
+    @Test
+    @DisplayName("Should classify /auth exact path as AUTH")
+    void classifyExactAuthPath() {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/auth");
+
+        assertEquals(RateLimitRule.AUTH, classifier.classify(request));
+    }
+
+    @Test
+    @DisplayName("Should normalize blank uri to root path")
+    void normalizeBlankUri() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setMethod("GET");
+        request.setRequestURI("   ");
+
+        assertEquals(RateLimitRule.READ, classifier.classify(request));
+    }
+
+    @Test
+    @DisplayName("Should normalize uri equal to context path")
+    void normalizeContextOnlyPath() {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api");
+        request.setContextPath("/api");
+
+        assertEquals(RateLimitRule.READ, classifier.classify(request));
     }
 }

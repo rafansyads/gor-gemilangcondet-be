@@ -1,6 +1,7 @@
 package io.mpruy.gor_gemilangcondet.backend_api.service;
 
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.responses.ConfirmPaymentResponse;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.responses.InvoiceResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.responses.PembayaranResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.responses.ReservasiResponse;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.payment.PaymentStatus;
@@ -161,6 +162,90 @@ class PembayaranServiceTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
+    // GET INVOICES FOR STAFF
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Nested
+    @DisplayName("Get Invoices For Staff Tests")
+    class GetInvoicesForStaffTests {
+
+        @Test
+        @DisplayName("Should group reservations by batch and singleton")
+        void getInvoicesForStaff_Grouped() {
+            UUID batchId = UUID.randomUUID();
+
+            Reservasi batchFirst = Reservasi.builder()
+                    .id(UUID.randomUUID())
+                    .batchId(batchId)
+                    .lapangan(testCourt)
+                    .userId(userId)
+                    .namaWakil("John")
+                    .reservationStart(LocalDateTime.now().plusDays(1).withHour(10).withMinute(0))
+                    .reservationEnd(LocalDateTime.now().plusDays(1).withHour(11).withMinute(0))
+                    .totalPayment(50000)
+                    .status(ReservasiStatus.MENUNGGU_KONFIRMASI_STAF)
+                    .paymentProofUrl("proof-a.jpg")
+                    .createdAt(LocalDateTime.now().minusHours(2))
+                    .updatedAt(LocalDateTime.now().minusHours(2))
+                    .build();
+
+            Reservasi batchSecond = Reservasi.builder()
+                    .id(UUID.randomUUID())
+                    .batchId(batchId)
+                    .lapangan(testCourt)
+                    .userId(userId)
+                    .namaWakil("John")
+                    .reservationStart(LocalDateTime.now().plusDays(1).withHour(11).withMinute(0))
+                    .reservationEnd(LocalDateTime.now().plusDays(1).withHour(12).withMinute(0))
+                    .totalPayment(60000)
+                    .status(ReservasiStatus.DIKONFIRMASI)
+                    .paymentProofUrl("proof-a.jpg")
+                    .createdAt(LocalDateTime.now().minusHours(2))
+                    .updatedAt(LocalDateTime.now().minusHours(2))
+                    .build();
+
+            Reservasi single = Reservasi.builder()
+                    .id(UUID.randomUUID())
+                    .batchId(null)
+                    .lapangan(testCourt)
+                    .userId(userId)
+                    .namaWakil("Jane")
+                    .reservationStart(LocalDateTime.now().plusDays(2).withHour(9).withMinute(0))
+                    .reservationEnd(LocalDateTime.now().plusDays(2).withHour(10).withMinute(0))
+                    .totalPayment(70000)
+                    .status(ReservasiStatus.MENUNGGU_KONFIRMASI_STAF)
+                    .paymentProofUrl("proof-b.jpg")
+                    .createdAt(LocalDateTime.now().minusHours(1))
+                    .updatedAt(LocalDateTime.now().minusHours(1))
+                    .build();
+
+            when(reservasiRepository.findByStatusInWithLapangan(anyList()))
+                    .thenReturn(List.of(batchSecond, single, batchFirst));
+
+            List<InvoiceResponse> invoices = pembayaranService.getInvoicesForStaff();
+
+            assertEquals(2, invoices.size());
+            assertEquals(single.getId().toString(), invoices.get(0).getInvoiceId());
+            assertEquals(1, invoices.get(0).getSlotCount());
+            assertEquals(batchId.toString(), invoices.get(1).getInvoiceId());
+            assertEquals(2, invoices.get(1).getSlotCount());
+            assertEquals(110000, invoices.get(1).getTotalAmount());
+            assertEquals(batchFirst.getId().toString(), invoices.get(1).getSlots().get(0).getReservationId());
+        }
+
+        @Test
+        @DisplayName("Should return empty invoice list when no staff reservations")
+        void getInvoicesForStaff_Empty() {
+            when(reservasiRepository.findByStatusInWithLapangan(anyList()))
+                    .thenReturn(Collections.emptyList());
+
+            List<InvoiceResponse> invoices = pembayaranService.getInvoicesForStaff();
+
+            assertTrue(invoices.isEmpty());
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
     // GET PAYMENT BY RESERVATION ID
     // ══════════════════════════════════════════════════════════════════════════
 
@@ -288,6 +373,58 @@ class PembayaranServiceTest {
         }
 
         @Test
+        @DisplayName("Should propagate proof upload to batch siblings")
+        void uploadProof_BatchPropagation() throws IOException {
+            ReflectionTestUtils.setField(pembayaranService, "uploadDir", "build/test-uploads/payment-proofs");
+
+            UUID batchId = UUID.randomUUID();
+            testReservasi.setBatchId(batchId);
+
+            Reservasi sibling = Reservasi.builder()
+                    .id(UUID.randomUUID())
+                    .batchId(batchId)
+                    .lapangan(testCourt)
+                    .userId(userId)
+                    .status(ReservasiStatus.BELUM_DIBAYAR)
+                    .createdAt(LocalDateTime.now())
+                    .updatedAt(LocalDateTime.now())
+                    .build();
+
+            MultipartFile file = mock(MultipartFile.class);
+            when(file.isEmpty()).thenReturn(false);
+            when(file.getOriginalFilename()).thenReturn("receipt.jpg");
+            when(file.getInputStream()).thenReturn(new ByteArrayInputStream("fake image".getBytes()));
+
+            when(reservasiRepository.findByIdWithLapangan(reservasiId)).thenReturn(Optional.of(testReservasi));
+            when(reservasiRepository.findByBatchId(batchId)).thenReturn(List.of(testReservasi, sibling));
+            when(reservasiRepository.save(any(Reservasi.class))).thenAnswer(i -> i.getArgument(0));
+
+            ReservasiResponse result = pembayaranService.uploadPaymentProof(reservasiId, file);
+
+            assertEquals(ReservasiStatus.MENUNGGU_KONFIRMASI_STAF, result.getStatus());
+            verify(reservasiRepository).save(argThat(r -> sibling.getId().equals(r.getId())
+                    && r.getStatus() == ReservasiStatus.MENUNGGU_KONFIRMASI_STAF));
+        }
+
+        @Test
+        @DisplayName("Should throw runtime exception when saving payment proof fails")
+        void uploadProof_SaveFileFails() throws IOException {
+            ReflectionTestUtils.setField(pembayaranService, "uploadDir", "build/test-uploads/payment-proofs");
+
+            MultipartFile file = mock(MultipartFile.class);
+            when(file.isEmpty()).thenReturn(false);
+            when(file.getOriginalFilename()).thenReturn("receipt.jpg");
+            when(file.getContentType()).thenReturn("image/jpeg");
+            when(file.getInputStream()).thenThrow(new IOException("disk error"));
+
+            when(reservasiRepository.findByIdWithLapangan(reservasiId))
+                    .thenReturn(Optional.of(testReservasi));
+
+            assertThrows(RuntimeException.class,
+                    () -> pembayaranService.uploadPaymentProof(reservasiId, file));
+        }
+
+        @Test
         @DisplayName("Should reject file with unsupported extension")
         void uploadProof_UnsupportedExtension() {
             MultipartFile file = mock(MultipartFile.class);
@@ -368,6 +505,52 @@ class PembayaranServiceTest {
             assertEquals(ReservasiStatus.DIKONFIRMASI, result.getReservationStatus());
             assertEquals(PaymentStatus.LUNAS, result.getPaymentStatus());
         }
+
+                @Test
+                @DisplayName("Should confirm payment and propagate to batch siblings")
+                void confirmPayment_BatchPropagation() {
+                        setUpStaffAuth();
+                        UUID batchId = UUID.randomUUID();
+                        testReservasi.setBatchId(batchId);
+                        testReservasi.setStatus(ReservasiStatus.MENUNGGU_KONFIRMASI_STAF);
+                        testReservasi.setPaymentProofUrl("proof.jpg");
+
+                        Reservasi sibling = Reservasi.builder()
+                                        .id(UUID.randomUUID())
+                                        .batchId(batchId)
+                                        .lapangan(testCourt)
+                                        .userId(userId)
+                                        .status(ReservasiStatus.MENUNGGU_KONFIRMASI_STAF)
+                                        .createdAt(LocalDateTime.now())
+                                        .updatedAt(LocalDateTime.now())
+                                        .build();
+
+                        when(reservasiRepository.findByIdWithLapangan(reservasiId)).thenReturn(Optional.of(testReservasi));
+                        when(reservasiRepository.findByBatchId(batchId)).thenReturn(List.of(testReservasi, sibling));
+                        when(pembayaranRepository.save(any(Pembayaran.class))).thenAnswer(i -> {
+                                Pembayaran p = i.getArgument(0);
+                                p.setId(UUID.randomUUID());
+                                return p;
+                        });
+                        when(reservasiRepository.save(any(Reservasi.class))).thenAnswer(i -> i.getArgument(0));
+
+                        ConfirmPaymentResponse result = pembayaranService.confirmPayment(reservasiId);
+
+                        assertEquals(ReservasiStatus.DIKONFIRMASI, result.getReservationStatus());
+                        verify(reservasiRepository).save(argThat(r -> sibling.getId().equals(r.getId())
+                                        && r.getStatus() == ReservasiStatus.DIKONFIRMASI));
+                }
+
+                @Test
+                @DisplayName("Should throw when staff is not authenticated during confirm")
+                void confirmPayment_UnauthenticatedStaff() {
+                        SecurityContextHolder.clearContext();
+                        testReservasi.setStatus(ReservasiStatus.MENUNGGU_KONFIRMASI_STAF);
+                        when(reservasiRepository.findByIdWithLapangan(reservasiId)).thenReturn(Optional.of(testReservasi));
+
+                        assertThrows(IllegalStateException.class,
+                                        () -> pembayaranService.confirmPayment(reservasiId));
+                }
 
         @Test
         @DisplayName("Should throw when reservation not found")
@@ -460,6 +643,17 @@ class PembayaranServiceTest {
             assertNotNull(result);
             assertEquals(ReservasiStatus.DITOLAK, result.getReservationStatus());
         }
+
+                @Test
+                @DisplayName("Should throw when staff is not authenticated during reject")
+                void rejectPayment_UnauthenticatedStaff() {
+                        SecurityContextHolder.clearContext();
+                        testReservasi.setStatus(ReservasiStatus.MENUNGGU_KONFIRMASI_STAF);
+                        when(reservasiRepository.findByIdWithLapangan(reservasiId)).thenReturn(Optional.of(testReservasi));
+
+                        assertThrows(IllegalStateException.class,
+                                        () -> pembayaranService.rejectPayment(reservasiId));
+                }
 
         @Test
         @DisplayName("Should throw when reservation not found")
