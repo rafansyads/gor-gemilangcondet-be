@@ -67,8 +67,8 @@ public class WebSecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/courts/image/**", "/api/courts/image/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/products/**", "/api/products/**").permitAll()
 
-                        // Barang / Produk API
-                        .requestMatchers("/barang/**", "/api/barang/**").permitAll()
+                        // Barang / Produk API — GET is public (catalog, POS, images); writes require authentication
+                        .requestMatchers(HttpMethod.GET, "/barang/**", "/api/barang/**").permitAll()
 
                         // Static files & H2 console (dev)
                         .requestMatchers("/", "/api", "/test-schedule.html", "/api/test-schedule.html", "/*.html",

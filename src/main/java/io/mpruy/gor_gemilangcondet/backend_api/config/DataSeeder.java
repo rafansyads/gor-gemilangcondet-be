@@ -15,6 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.Lapangan;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.LapanganStatus;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.reservations.LapanganType;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.pos.PosProduct;
+import io.mpruy.gor_gemilangcondet.backend_api.entities.pos.PosProductCategory;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.Barang;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.alat_olahraga.AlatOlahraga;
 import io.mpruy.gor_gemilangcondet.backend_api.entities.stocks.alat_olahraga.AlatOlahragaStatus;
@@ -34,6 +36,7 @@ import io.mpruy.gor_gemilangcondet.backend_api.repository.BarangKantinRepository
 import io.mpruy.gor_gemilangcondet.backend_api.repository.BarangRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.BarangTokoRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.LapanganRepository;
+import io.mpruy.gor_gemilangcondet.backend_api.repository.PosProductRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.RoleRepository;
 import io.mpruy.gor_gemilangcondet.backend_api.repository.UserStatusRepository;
 import jakarta.persistence.EntityManager;
@@ -57,6 +60,7 @@ public class DataSeeder implements ApplicationRunner {
     private final UserStatusRepository userStatusRepository;
     private final LapanganRepository lapanganRepository;
     private final AlatOlahragaRepository alatOlahragaRepository;
+    private final PosProductRepository posProductRepository;
     private final BarangRepository barangRepository;
     private final BarangKantinRepository barangKantinRepository;
     private final BarangTokoRepository barangTokoRepository;
@@ -69,18 +73,19 @@ public class DataSeeder implements ApplicationRunner {
         seedRoles();
         seedLapangan(); // nantinya tergantung GOR
         seedAlatOlahraga(); // nantinya tergantung GOR, bisa jadi tidak ada alat olahraga yang disewakan
+        seedPosProducts();
         migrateLegacySellableRowsToConcreteSubclasses();
         seedBarangJual(); // seed makanan & minuman untuk dijual di kasir
-        resetAllLapanganToTersedia();
     }
 
+    @Transactional
     private void migrateLegacySellableRowsToConcreteSubclasses() {
         // Convert legacy plain barang rows (pre-abstract migration) into concrete
         // child rows while preserving existing IDs and FK references.
-        migrateLegacyKantin("Nasi Goreng", "MAKANAN_BERAT", 10);
-        migrateLegacyKantin("Mie Goreng", "MAKANAN_BERAT", 10);
-        migrateLegacyKantin("Roti Bakar", "MAKANAN_RINGAN", 8);
-        migrateLegacyKantin("Kentang Goreng", "MAKANAN_RINGAN", 8);
+        migrateLegacyKantin("Nasi Goreng", "MAKANAN", 10);
+        migrateLegacyKantin("Mie Goreng", "MAKANAN", 10);
+        migrateLegacyKantin("Roti Bakar", "MAKANAN", 8);
+        migrateLegacyKantin("Kentang Goreng", "MAKANAN", 8);
         migrateLegacyKantin("Teh Botol", "MINUMAN", 20);
         migrateLegacyKantin("Air Mineral", "MINUMAN", 20);
         migrateLegacyKantin("Kopi Hitam", "MINUMAN", 15);
@@ -239,24 +244,6 @@ public class DataSeeder implements ApplicationRunner {
     }
 
     /**
-     * Reset semua lapangan yang tidak TERSEDIA kembali ke TERSEDIA saat startup.
-     * Berguna di development agar semua lapangan selalu bisa dipesan ulang.
-     */
-    private void resetAllLapanganToTersedia() {
-        LocalDateTime now = LocalDateTime.now();
-        lapanganRepository.findAll().forEach(lapangan -> {
-            if (lapangan.getStatus() != LapanganStatus.TERSEDIA) {
-                lapangan.setStatus(LapanganStatus.TERSEDIA);
-                lapangan.setMaintenanceStart(null);
-                lapangan.setMaintenanceEnd(null);
-                lapangan.setUpdatedAt(now);
-                lapanganRepository.save(lapangan);
-                log.info("Reset lapangan ke TERSEDIA: {} ({})", lapangan.getName(), lapangan.getType());
-            }
-        });
-    }
-
-    /**
      * Development-seeding.
      * Uses JOINED inheritance — AlatOlahraga extends Barang. The unique constraint
      * on 'name' lives in the parent 'barang' table. On schema changes the join
@@ -305,6 +292,46 @@ public class DataSeeder implements ApplicationRunner {
     }
 
     /**
+     * Development-seeding untuk produk POS (kantin/toko).
+     * Idempotent: hanya mengisi data jika tabel masih kosong.
+     */
+    private void seedPosProducts() {
+        if (posProductRepository.count() > 0) {
+            return;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        List<PosProduct> products = List.of(
+            PosProduct.builder().name("Nasi Goreng").sku("KNT-MKN-001").price(15000).stock(50)
+                .category(PosProductCategory.MAKANAN).createdAt(now).updatedAt(now).build(),
+            PosProduct.builder().name("Mie Goreng").sku("KNT-MKN-002").price(14000).stock(40)
+                .category(PosProductCategory.MAKANAN).createdAt(now).updatedAt(now).build(),
+            PosProduct.builder().name("Sosis Bakar").sku("KNT-MKN-003").price(12000).stock(25)
+                .category(PosProductCategory.MAKANAN).createdAt(now).updatedAt(now).build(),
+            PosProduct.builder().name("Es Teh").sku("KNT-MNM-001").price(6000).stock(80)
+                .category(PosProductCategory.MINUMAN).createdAt(now).updatedAt(now).build(),
+            PosProduct.builder().name("Jus Jeruk").sku("KNT-MNM-002").price(10000).stock(35)
+                .category(PosProductCategory.MINUMAN).createdAt(now).updatedAt(now).build(),
+            PosProduct.builder().name("Air Mineral").sku("KNT-MNM-003").price(5000).stock(120)
+                .category(PosProductCategory.MINUMAN).createdAt(now).updatedAt(now).build(),
+            PosProduct.builder().name("Raket Pro 7U").sku("RTL-RKT-001").price(450000).stock(18)
+                .category(PosProductCategory.RAKET).createdAt(now).updatedAt(now).build(),
+            PosProduct.builder().name("Raket Training").sku("RTL-RKT-002").price(275000).stock(12)
+                .category(PosProductCategory.RAKET).createdAt(now).updatedAt(now).build(),
+            PosProduct.builder().name("Sepatu Court Lite").sku("RTL-SPT-001").price(520000).stock(10)
+                .category(PosProductCategory.SEPATU).createdAt(now).updatedAt(now).build(),
+            PosProduct.builder().name("Sepatu Court Grip").sku("RTL-SPT-002").price(610000).stock(8)
+                .category(PosProductCategory.SEPATU).createdAt(now).updatedAt(now).build(),
+            PosProduct.builder().name("Grip Raket").sku("RTL-AKS-001").price(22000).stock(90)
+                .category(PosProductCategory.AKSESORIS).createdAt(now).updatedAt(now).build(),
+            PosProduct.builder().name("Wristband").sku("RTL-AKS-002").price(30000).stock(27)
+                .category(PosProductCategory.AKSESORIS).createdAt(now).updatedAt(now).build());
+
+        posProductRepository.saveAll(products);
+        log.info("Seeded {} produk POS", products.size());
+    }
+
+    /**
      * Development-seeding.
      * Seeds sellable items into concrete subclasses (kantin & toko).
      * Idempotent by name to avoid duplicate seeds on repeated startup.
@@ -332,22 +359,22 @@ public class DataSeeder implements ApplicationRunner {
 
         if (!existingNames.contains("Nasi Goreng")) {
             kantinItems.add(BarangKantin.builder().name("Nasi Goreng")
-                    .type(BarangKantinType.MAKANAN_BERAT).status(BarangKantinStatus.TERSEDIA)
+                    .type(BarangKantinType.MAKANAN).status(BarangKantinStatus.TERSEDIA)
                     .reorderThreshold(10).stock(50).price(15000).createdAt(now).updatedAt(now).build());
         }
         if (!existingNames.contains("Mie Goreng")) {
             kantinItems.add(BarangKantin.builder().name("Mie Goreng")
-                    .type(BarangKantinType.MAKANAN_BERAT).status(BarangKantinStatus.TERSEDIA)
+                    .type(BarangKantinType.MAKANAN).status(BarangKantinStatus.TERSEDIA)
                     .reorderThreshold(10).stock(50).price(12000).createdAt(now).updatedAt(now).build());
         }
         if (!existingNames.contains("Roti Bakar")) {
             kantinItems.add(BarangKantin.builder().name("Roti Bakar")
-                    .type(BarangKantinType.MAKANAN_RINGAN).status(BarangKantinStatus.TERSEDIA)
+                    .type(BarangKantinType.MAKANAN).status(BarangKantinStatus.TERSEDIA)
                     .reorderThreshold(8).stock(30).price(10000).createdAt(now).updatedAt(now).build());
         }
         if (!existingNames.contains("Kentang Goreng")) {
             kantinItems.add(BarangKantin.builder().name("Kentang Goreng")
-                    .type(BarangKantinType.MAKANAN_RINGAN).status(BarangKantinStatus.TERSEDIA)
+                    .type(BarangKantinType.MAKANAN).status(BarangKantinStatus.TERSEDIA)
                     .reorderThreshold(8).stock(40).price(12000).createdAt(now).updatedAt(now).build());
         }
 
