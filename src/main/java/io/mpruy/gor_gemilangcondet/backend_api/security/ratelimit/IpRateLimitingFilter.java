@@ -13,6 +13,7 @@ import java.util.concurrent.TimeUnit;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -25,6 +26,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 @Component
+@ConditionalOnBean({
+        RateLimitRequestClassifier.class,
+        ClientIpResolver.class,
+        IpRateLimitBucketService.class
+})
 public class IpRateLimitingFilter extends OncePerRequestFilter {
 
     private static final String MESSAGE_PREFIX = "Terlalu banyak permintaan. Silakan coba lagi dalam ";

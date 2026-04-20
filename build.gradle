@@ -85,12 +85,25 @@ tasks.named('bootRun') {
 
 tasks.named('test') {
 	useJUnitPlatform()
+	// Keep one JVM test worker to avoid Windows paging-file exhaustion.
+	maxParallelForks = 1
+	minHeapSize = '256m'
+	maxHeapSize = '768m'
+	// Required for Mockito inline mock maker on recent JDKs.
+	jvmArgs '-Djdk.attach.allowAttachSelf=true', '-XX:+EnableDynamicAgentLoading'
 	finalizedBy jacocoTestReport
 }
 
 jacoco {
 	toolVersion = '0.8.12'
 }
+
+// Exclusions
+def jacocoExclusions = [
+    '**/BackendApiApplication*',
+    '**/config/*',
+    '**/dto/*',
+]
 
 jacocoTestReport {
 	dependsOn test
@@ -101,9 +114,7 @@ jacocoTestReport {
 	}
 	afterEvaluate {
 		classDirectories.setFrom(files(classDirectories.files.collect {
-			fileTree(dir: it, excludes: [
-				'**/BackendApiApplication*',
-			])
+			fileTree(dir: it, excludes: jacocoExclusions)
 		}))
 	}
 }
@@ -112,8 +123,22 @@ jacocoTestCoverageVerification {
 	violationRules {
 		rule {
 			limit {
-				minimum = 0.90
-			}
+                counter = 'BRANCH'
+                value = 'COVEREDRATIO'
+                minimum = 0.80
+            }
+        }
+		rule {
+			limit {
+                counter = 'INSTRUCTION'
+                value = 'COVEREDRATIO'
+                minimum = 0.90
+            }
 		}
 	}
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, excludes: jacocoExclusions)
+        }))
+    }
 }

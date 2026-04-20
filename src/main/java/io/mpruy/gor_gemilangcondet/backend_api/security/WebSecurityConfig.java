@@ -4,6 +4,7 @@ import java.io.IOException;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationProvider;
@@ -32,7 +33,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class WebSecurityConfig {
 
-    private final IpRateLimitingFilter ipRateLimitingFilter;
+    private final ObjectProvider<IpRateLimitingFilter> ipRateLimitingFilterProvider;
     private final JwtTokenFilter jwtTokenFilter;
     private final AuthenticationProvider authenticationProvider;
 
@@ -78,7 +79,6 @@ public class WebSecurityConfig {
                         .anyRequest().authenticated())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider)
-                .addFilterAfter(ipRateLimitingFilter, SecurityContextHolderFilter.class)
                 .addFilterBefore(jwtTokenFilter, UsernamePasswordAuthenticationFilter.class)
                 .exceptionHandling(e -> e
                         .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
@@ -92,6 +92,11 @@ public class WebSecurityConfig {
                                 response.getWriter().write("Akses ditolak");
                             }
                         }));
+
+        IpRateLimitingFilter ipRateLimitingFilter = ipRateLimitingFilterProvider.getIfAvailable();
+        if (ipRateLimitingFilter != null) {
+            http.addFilterAfter(ipRateLimitingFilter, SecurityContextHolderFilter.class);
+        }
 
         return http.build();
     }
