@@ -38,7 +38,7 @@ class StockMapperTest {
         BarangKantin kantin = BarangKantin.builder()
                 .id(UUID.randomUUID())
                 .name("Nasi Goreng")
-                .type(BarangKantinType.MAKANAN_BERAT)
+                .type(BarangKantinType.MAKANAN)
                 .status(BarangKantinStatus.TERSEDIA)
                 .reorderThreshold(10)
                 .stock(5)
@@ -48,7 +48,7 @@ class StockMapperTest {
         StockItemResponse response = stockMapper.toItemResponse(kantin);
 
         assertEquals("BARANG_KANTIN", response.getKategori());
-        assertEquals("MAKANAN_BERAT", response.getItemType());
+        assertEquals("MAKANAN", response.getItemType());
         assertEquals(10, response.getAmbangBatas());
         assertEquals("RENDAH", response.getStatus());
         assertEquals(75000, response.getNilaiStok());
@@ -112,7 +112,7 @@ class StockMapperTest {
         BarangKantin kantin = BarangKantin.builder()
                 .id(UUID.fromString("01234567-89ab-cdef-0123-456789abcdef"))
                 .name("Roti")
-                .type(BarangKantinType.MAKANAN_RINGAN)
+                .type(BarangKantinType.MAKANAN)
                 .status(BarangKantinStatus.TERSEDIA)
                 .reorderThreshold(1)
                 .stock(4)

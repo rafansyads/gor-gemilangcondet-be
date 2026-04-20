@@ -2,6 +2,7 @@ package io.mpruy.gor_gemilangcondet.backend_api.dto.stocks;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -15,6 +16,15 @@ public class BarangRequestDto {
 
     @NotBlank(message = "Nama produk tidak boleh kosong")
     private String name;
+
+    /** MAKANAN | MINUMAN | SHUTTLECOCK | RAKET_SENAR | AKSESORIS */
+    @NotBlank(message = "Kategori produk tidak boleh kosong")
+    private String category;
+
+    private String sku;
+
+    @Min(value = 0, message = "Harga beli tidak boleh negatif")
+    private double purchasePrice;
 
     @Min(value = 0, message = "Harga jual tidak boleh negatif")
     private double price;
