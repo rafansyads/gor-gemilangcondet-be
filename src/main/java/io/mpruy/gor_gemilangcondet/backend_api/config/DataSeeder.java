@@ -76,7 +76,6 @@ public class DataSeeder implements ApplicationRunner {
         seedPosProducts();
         migrateLegacySellableRowsToConcreteSubclasses(); // migrate legacy barang rows to concrete subclasses
         seedBarangJual(); // seed makanan & minuman untuk dijual di kasir
-        resetAllLapanganToTersedia();
     }
 
     @Transactional
@@ -242,24 +241,6 @@ public class DataSeeder implements ApplicationRunner {
 
         lapanganRepository.saveAll(courts);
         courts.forEach(c -> log.info("Seeded lapangan: {} ({})", c.getName(), c.getType()));
-    }
-
-    /**
-     * Reset semua lapangan yang tidak TERSEDIA kembali ke TERSEDIA saat startup.
-     * Berguna di development agar semua lapangan selalu bisa dipesan ulang.
-     */
-    private void resetAllLapanganToTersedia() {
-        LocalDateTime now = LocalDateTime.now();
-        lapanganRepository.findAll().forEach(lapangan -> {
-            if (lapangan.getStatus() != LapanganStatus.TERSEDIA) {
-                lapangan.setStatus(LapanganStatus.TERSEDIA);
-                lapangan.setMaintenanceStart(null);
-                lapangan.setMaintenanceEnd(null);
-                lapangan.setUpdatedAt(now);
-                lapanganRepository.save(lapangan);
-                log.info("Reset lapangan ke TERSEDIA: {} ({})", lapangan.getName(), lapangan.getType());
-            }
-        });
     }
 
     /**
