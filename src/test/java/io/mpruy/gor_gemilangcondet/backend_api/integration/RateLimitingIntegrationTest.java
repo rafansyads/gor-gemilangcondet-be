@@ -75,7 +75,8 @@ class RateLimitingIntegrationTest {
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().exists("Retry-After"))
                 .andExpect(jsonPath("$.status").value(429))
-                .andExpect(jsonPath("$.message").value(startsWith("Terlalu banyak permintaan. Silakan coba lagi dalam ")))
+                .andExpect(
+                        jsonPath("$.message").value(startsWith("Terlalu banyak permintaan. Silakan coba lagi dalam ")))
                 .andExpect(jsonPath("$.timestamp").isNotEmpty())
                 .andExpect(jsonPath("$.data.rule").value("auth"))
                 .andExpect(jsonPath("$.data.retryAfterSeconds").value(greaterThan(0)));
@@ -108,7 +109,8 @@ class RateLimitingIntegrationTest {
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().exists("Retry-After"))
                 .andExpect(jsonPath("$.status").value(429))
-                .andExpect(jsonPath("$.message").value(startsWith("Terlalu banyak permintaan. Silakan coba lagi dalam ")))
+                .andExpect(
+                        jsonPath("$.message").value(startsWith("Terlalu banyak permintaan. Silakan coba lagi dalam ")))
                 .andExpect(jsonPath("$.timestamp").isNotEmpty())
                 .andExpect(jsonPath("$.data.rule").value("cud"))
                 .andExpect(jsonPath("$.data.retryAfterSeconds").value(greaterThan(0)));
@@ -140,7 +142,8 @@ class RateLimitingIntegrationTest {
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().exists("Retry-After"))
                 .andExpect(jsonPath("$.status").value(429))
-                .andExpect(jsonPath("$.message").value(startsWith("Terlalu banyak permintaan. Silakan coba lagi dalam ")))
+                .andExpect(
+                        jsonPath("$.message").value(startsWith("Terlalu banyak permintaan. Silakan coba lagi dalam ")))
                 .andExpect(jsonPath("$.timestamp").isNotEmpty())
                 .andExpect(jsonPath("$.data.rule").value("read"))
                 .andExpect(jsonPath("$.data.retryAfterSeconds").value(greaterThan(0)));
