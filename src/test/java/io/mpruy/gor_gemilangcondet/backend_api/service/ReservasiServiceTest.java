@@ -1,8 +1,10 @@
 package io.mpruy.gor_gemilangcondet.backend_api.service;
 
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.requests.CreateLapanganRequest;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.requests.CreateBatchReservasiRequest;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.requests.CreateReservasiRequest;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.requests.RentItemRequest;
+import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.requests.RescheduleBatchRequest;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.requests.RescheduleReservasiRequest;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.requests.UpdateLapanganRequest;
 import io.mpruy.gor_gemilangcondet.backend_api.dto.reservations.responses.*;
@@ -24,6 +26,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -796,4 +799,237 @@ class ReservasiServiceTest {
             assertTrue(result.isEmpty());
         }
     }
+
+        // ══════════════════════════════════════════════════════════════════════════
+        // ADDITIONAL COURT & BATCH COVERAGE
+        // ══════════════════════════════════════════════════════════════════════════
+
+        @Nested
+        @DisplayName("Additional Court And Batch Tests")
+        class AdditionalCourtAndBatchTests {
+
+                private CreateReservasiRequest buildBatchReservationRequest(LocalDateTime start) {
+                        CreateReservasiRequest req = new CreateReservasiRequest();
+                        req.setLapanganId(courtId);
+                        req.setReservationStart(start.withMinute(0).withSecond(0).withNano(0));
+                        req.setDurationInHours(1);
+                        req.setUserId(userId);
+                        req.setNamaWakil("Batch User");
+                        req.setNomorTelepon("0811111111");
+                        req.setJumlahOrang(4);
+                        return req;
+                }
+
+                private Reservasi buildReservasi(UUID id, UUID batchId, LocalDateTime start, LocalDateTime end) {
+                        return Reservasi.builder()
+                                        .id(id)
+                                        .batchId(batchId)
+                                        .lapangan(testCourt)
+                                        .userId(userId)
+                                        .reservationStart(start)
+                                        .reservationEnd(end)
+                                        .namaWakil("Batch User")
+                                        .nomorTelepon("0811111111")
+                                        .jumlahOrang(4)
+                                        .totalPayment(testCourt.getTarifPerJam())
+                                        .status(ReservasiStatus.BELUM_DIBAYAR)
+                                        .paymentDeadline(LocalDateTime.now().plusMinutes(10))
+                                        .createdAt(LocalDateTime.now())
+                                        .updatedAt(LocalDateTime.now())
+                                        .rentList(Collections.emptyList())
+                                        .build();
+                }
+
+                @Test
+                @DisplayName("Should return court by ID")
+                void getCourt_Success() {
+                        when(lapanganRepository.findById(courtId)).thenReturn(Optional.of(testCourt));
+
+                        LapanganResponse response = reservasiService.getCourt(courtId);
+
+                        assertEquals(courtId, response.getId());
+                        assertEquals("Badminton 1", response.getName());
+                }
+
+                @Test
+                @DisplayName("Should throw when court does not exist")
+                void getCourt_NotFound() {
+                        UUID randomId = UUID.randomUUID();
+                        when(lapanganRepository.findById(randomId)).thenReturn(Optional.empty());
+
+                        assertThrows(ResourceNotFoundException.class, () -> reservasiService.getCourt(randomId));
+                }
+
+                @Test
+                @DisplayName("Should upload court image successfully")
+                void uploadCourtImage_Success() throws Exception {
+                        when(lapanganRepository.findById(courtId)).thenReturn(Optional.of(testCourt));
+                        when(lapanganRepository.saveAndFlush(any(Lapangan.class))).thenAnswer(i -> i.getArgument(0));
+
+                        MockMultipartFile file = new MockMultipartFile(
+                                        "image",
+                                        "court.jpg",
+                                        "image/jpeg",
+                                        "fake-image-content".getBytes());
+
+                        LapanganResponse response = reservasiService.uploadCourtImage(courtId, file);
+
+                        assertNotNull(response.getImageUrl());
+                        assertTrue(response.getImageUrl().startsWith("court-"));
+                }
+
+                @Test
+                @DisplayName("Should map court logs")
+                void getCourtLogs_Success() {
+                        UUID logId = UUID.randomUUID();
+                        UUID actorId = UUID.randomUUID();
+                        LapanganLog log = LapanganLog.builder()
+                                        .id(logId)
+                                        .lapanganId(courtId)
+                                        .userId(actorId)
+                                        .username("admin")
+                                        .changeDescription("Harga: Rp 50.000 -> Rp 60.000")
+                                        .createdAt(LocalDateTime.now())
+                                        .build();
+
+                        when(lapanganLogRepository.findByLapanganIdOrderByCreatedAtDesc(courtId)).thenReturn(List.of(log));
+
+                        List<LapanganLogResponse> result = reservasiService.getCourtLogs(courtId);
+
+                        assertEquals(1, result.size());
+                        assertEquals(logId, result.get(0).getId());
+                        assertEquals(actorId, result.get(0).getUserId());
+                        assertEquals("admin", result.get(0).getUsername());
+                }
+
+                @Test
+                @DisplayName("Should return reservations by batch ID")
+                void getBatchByBatchId_Success() {
+                        UUID batchId = UUID.randomUUID();
+                        Reservasi reservasi = buildReservasi(
+                                        UUID.randomUUID(),
+                                        batchId,
+                                        LocalDateTime.now().plusDays(2).withHour(10).withMinute(0).withSecond(0).withNano(0),
+                                        LocalDateTime.now().plusDays(2).withHour(11).withMinute(0).withSecond(0).withNano(0));
+
+                        when(reservasiRepository.findByBatchId(batchId)).thenReturn(List.of(reservasi));
+
+                        List<ReservasiResponse> result = reservasiService.getBatchByBatchId(batchId);
+
+                        assertEquals(1, result.size());
+                        assertEquals(batchId, result.get(0).getBatchId());
+                }
+
+                @Test
+                @DisplayName("Should create batch reservation successfully")
+                void createBatchReservation_Success() {
+                        LocalDateTime day = LocalDateTime.now().plusDays(2).withSecond(0).withNano(0);
+                        CreateReservasiRequest slot1 = buildBatchReservationRequest(day.withHour(9));
+                        CreateReservasiRequest slot2 = buildBatchReservationRequest(day.withHour(11));
+
+                        CreateBatchReservasiRequest request = new CreateBatchReservasiRequest();
+                        request.setReservations(List.of(slot1, slot2));
+
+                        when(lapanganRepository.findByIdWithPessimisticLock(courtId)).thenReturn(Optional.of(testCourt));
+                        when(reservasiRepository.findOverlappingReservations(eq(courtId), any(), any(), any()))
+                                        .thenReturn(Collections.emptyList());
+                        when(reservasiRepository.save(any(Reservasi.class))).thenAnswer(i -> {
+                                Reservasi saved = i.getArgument(0);
+                                saved.setId(UUID.randomUUID());
+                                return saved;
+                        });
+
+                        BatchReservasiResponse response = reservasiService.createBatchReservation(request);
+
+                        assertNotNull(response.getBatchId());
+                        assertEquals(2, response.getReservations().size());
+                        assertEquals(testCourt.getTarifPerJam() * 2, response.getTotalPayment());
+                        verify(reservasiRepository, times(2)).save(any(Reservasi.class));
+                }
+
+                @Test
+                @DisplayName("Should reject batch reservation when one slot overlaps")
+                void createBatchReservation_Overlapping() {
+                        LocalDateTime day = LocalDateTime.now().plusDays(2).withSecond(0).withNano(0);
+                        CreateReservasiRequest slot = buildBatchReservationRequest(day.withHour(9));
+
+                        CreateBatchReservasiRequest request = new CreateBatchReservasiRequest();
+                        request.setReservations(List.of(slot));
+
+                        when(lapanganRepository.findByIdWithPessimisticLock(courtId)).thenReturn(Optional.of(testCourt));
+                        when(reservasiRepository.findOverlappingReservations(eq(courtId), any(), any(), any()))
+                                        .thenReturn(List.of(Reservasi.builder().id(UUID.randomUUID()).build()));
+
+                        assertThrows(BadRequestException.class, () -> reservasiService.createBatchReservation(request));
+                }
+
+                @Test
+                @DisplayName("Should reschedule a batch successfully")
+                void rescheduleBatch_Success() {
+                        UUID batchId = UUID.randomUUID();
+                        LocalDateTime day = LocalDateTime.now().plusDays(3).withSecond(0).withNano(0);
+
+                        Reservasi first = buildReservasi(UUID.randomUUID(), batchId, day.withHour(10).withMinute(0),
+                                        day.withHour(11).withMinute(0));
+                        Reservasi second = buildReservasi(UUID.randomUUID(), batchId, day.withHour(12).withMinute(0),
+                                        day.withHour(13).withMinute(0));
+
+                        RescheduleBatchRequest request = new RescheduleBatchRequest();
+                        request.setNewStarts(List.of(day.plusDays(1).withHour(14).withMinute(0),
+                                        day.plusDays(1).withHour(16).withMinute(0)));
+
+                        when(reservasiRepository.findByBatchId(batchId)).thenReturn(List.of(first, second));
+                        when(lapanganRepository.findByIdWithPessimisticLock(courtId)).thenReturn(Optional.of(testCourt));
+                        when(reservasiRepository.findOverlappingReservations(eq(courtId), any(), any(), any()))
+                                        .thenReturn(Collections.emptyList());
+                        when(reservasiRepository.save(any(Reservasi.class))).thenAnswer(i -> {
+                                Reservasi saved = i.getArgument(0);
+                                saved.setId(UUID.randomUUID());
+                                return saved;
+                        });
+
+                        BatchReservasiResponse response = reservasiService.rescheduleBatch(batchId, request);
+
+                        assertEquals(batchId, response.getBatchId());
+                        assertEquals(2, response.getReservations().size());
+                        assertEquals(testCourt.getTarifPerJam() * 2, response.getTotalPayment());
+                        verify(reservasiRepository).deleteAll(List.of(first, second));
+                        verify(reservasiRepository, times(2)).save(any(Reservasi.class));
+                }
+
+                @Test
+                @DisplayName("Should throw when rescheduling unknown batch")
+                void rescheduleBatch_NotFound() {
+                        UUID batchId = UUID.randomUUID();
+                        RescheduleBatchRequest request = new RescheduleBatchRequest();
+                        request.setNewStarts(List.of(LocalDateTime.now().plusDays(2).withHour(10).withMinute(0)));
+
+                        when(reservasiRepository.findByBatchId(batchId)).thenReturn(Collections.emptyList());
+
+                        assertThrows(ResourceNotFoundException.class, () -> reservasiService.rescheduleBatch(batchId, request));
+                }
+
+                @Test
+                @DisplayName("Should reject duplicated starts in batch reschedule request")
+                void rescheduleBatch_DuplicateStarts() {
+                        UUID batchId = UUID.randomUUID();
+                        LocalDateTime day = LocalDateTime.now().plusDays(3).withSecond(0).withNano(0);
+
+                        Reservasi first = buildReservasi(UUID.randomUUID(), batchId, day.withHour(10).withMinute(0),
+                                        day.withHour(11).withMinute(0));
+                        Reservasi second = buildReservasi(UUID.randomUUID(), batchId, day.withHour(12).withMinute(0),
+                                        day.withHour(13).withMinute(0));
+
+                        LocalDateTime duplicateStart = day.plusDays(1).withHour(14).withMinute(0);
+                        RescheduleBatchRequest request = new RescheduleBatchRequest();
+                        request.setNewStarts(List.of(duplicateStart, duplicateStart));
+
+                        when(reservasiRepository.findByBatchId(batchId)).thenReturn(List.of(first, second));
+                        when(lapanganRepository.findByIdWithPessimisticLock(courtId)).thenReturn(Optional.of(testCourt));
+                        when(reservasiRepository.findOverlappingReservations(eq(courtId), any(), any(), any()))
+                                        .thenReturn(Collections.emptyList());
+
+                        assertThrows(BadRequestException.class, () -> reservasiService.rescheduleBatch(batchId, request));
+                }
+        }
 }
