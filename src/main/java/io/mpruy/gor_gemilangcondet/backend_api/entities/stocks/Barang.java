@@ -37,4 +37,8 @@ public abstract class Barang {
     private String unit;
 
     private String imageUrl;
+
+    private String sku;
+
+    private Double purchasePrice;
 }

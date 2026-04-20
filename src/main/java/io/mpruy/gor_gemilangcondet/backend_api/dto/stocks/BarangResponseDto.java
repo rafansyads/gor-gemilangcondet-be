@@ -14,6 +14,9 @@ import java.util.UUID;
 public class BarangResponseDto {
     private UUID id;
     private String name;
+    private String category;
+    private String sku;
+    private double purchasePrice;
     private double price;
     private long stock;
     private String unit;
